@@ -16,21 +16,15 @@ Item {
         id: tabButton
         TabButton {
             id: control
-            contentItem: IconImage {
-                source: control.icon.source
-                color: "white"
+            contentItem: Item {
+                IconImage {
+                    anchors.centerIn: parent
+                    source: control.icon.source
+                    sourceSize.width: 24
+                    sourceSize.height: 24
+                    color: "white"
+                }
             }
-            // Material.primary: Material.Red
-            // Material.accent: Material.Indigo
-
-            // background: Rectangle {
-            //     implicitWidth: 100
-            //     implicitHeight: 50
-            //     opacity: enabled ? 1 : 0.3
-            //     border.color: control.down ? "#17a81a" : "black"
-            //     border.width: 1
-            //     radius: 2
-            // }
         }
     }
 

@@ -12,22 +12,13 @@ ApplicationWindow {
     title: qsTr("Hello World")
     visibility: platform == "android" ? Window.FullScreen : Window.Windowed // qmllint disable unqualified
 
-    Material.accent: Material.LightBlue
-    Material.theme: Material.System
-
     property var idleItem
 
     Component.onCompleted: {
         HassLLApi.register_handler_for_state_updates(function (response) {
-                // console.log("Got update for", response["entity_id"]);
                 controller.hassApiRequestDataUpdated(response["entity_id"], response);
             }, "Main.qml");
     }
-
-    // Image {
-    //     anchors.fill: parent
-    //     source: "qrc:/qt-hass/homekit-bg-blue-red.jpg"
-    // }
 
     Drawer {
         id: drawer
@@ -39,11 +30,14 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 80
+                Layout.preferredHeight: 50
                 Layout.leftMargin: 10
-                color: "green"
+                color: "transparent"
 
                 Label {
+                    anchors.fill: parent
+                    // horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
                     text: "Settings"
                 }
                 MouseArea {
@@ -54,53 +48,100 @@ ApplicationWindow {
                     }
                 }
             }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 50
+                Layout.leftMargin: 10
+                color: "transparent"
+
+                Label {
+                    anchors.fill: parent
+                    // horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: "About"
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        aboutPopup.open();
+                        drawer.close();
+                    }
+                }
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 50
+                Layout.leftMargin: 10
+                color: "transparent"
+
+                Label {
+                    anchors.fill: parent
+                    // horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: "Screensaver"
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    onClicked: {
+                        drawer.close();
+                        window.idleItem = mainItem.push(idleComponent);
+                    }
+                }
+            }
 
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 1
                 color: "black"
             }
+            Item {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+            }
         }
     }
 
-    StackView {
-        id: mainItem
+    Page {
         anchors.fill: parent
-        pushEnter: Transition {
-            PropertyAnimation {
-                property: "opacity"
-                from: 0
-                to: 1
-                duration: 200
+        StackView {
+            id: mainItem
+            anchors.fill: parent
+            pushEnter: Transition {
+                PropertyAnimation {
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: 200
+                }
             }
-        }
-        pushExit: Transition {
-            PropertyAnimation {
-                property: "opacity"
-                from: 1
-                to: 0
-                duration: 200
+            pushExit: Transition {
+                PropertyAnimation {
+                    property: "opacity"
+                    from: 1
+                    to: 0
+                    duration: 200
+                }
             }
-        }
-        popEnter: Transition {
-            PropertyAnimation {
-                property: "opacity"
-                from: 0
-                to: 1
-                duration: 200
+            popEnter: Transition {
+                PropertyAnimation {
+                    property: "opacity"
+                    from: 0
+                    to: 1
+                    duration: 200
+                }
             }
-        }
-        popExit: Transition {
-            PropertyAnimation {
-                property: "opacity"
-                from: 1
-                to: 0
-                duration: 200
+            popExit: Transition {
+                PropertyAnimation {
+                    property: "opacity"
+                    from: 1
+                    to: 0
+                    duration: 200
+                }
             }
-        }
 
-        initialItem: Loader {
-            id: dashboardLoader
+            initialItem: Loader {
+                id: dashboardLoader
+            }
         }
     }
 
@@ -160,11 +201,21 @@ ApplicationWindow {
                     configuration: configuration
                 });
         }
-
     }
 
     DetailsPopup {
         id: detailsPopup
+        opacity: 0.8
+        closePolicy: Popup.CloseOnPressOutside
+        modal: true
+        width: parent.width * 0.9
+        height: parent.width * 0.9
+        focus: true
+        anchors.centerIn: parent
+    }
+
+    Popup {
+        id: aboutPopup
         opacity: 0.8
         closePolicy: Popup.CloseOnPressOutside
         modal: true

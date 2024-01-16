@@ -21,10 +21,6 @@ EntityBase {
     Item {
         anchors.fill: parent
 
-        // color: "transparent"
-        // color: Qt.rgba(54 / 255, 54 / 255, 54 / 255, 0.6)
-        // radius: 10
-
         readonly property string type: entity_data.entity.split(".")[0]
         readonly property string entity_name: entity_data.entity.split(".")[1]
 

@@ -21,6 +21,7 @@ FetchContent_MakeAvailable(yaml-cpp)
 qt_standard_project_setup()
 
 qt_add_executable(appqt-hass main.cpp controller.cpp hass.cpp)
+qt_add_resources(appqt-hass PREFIX "/" FILES qtquickcontrols2.conf)
 
 qt_add_qml_module(
   appqt-hass

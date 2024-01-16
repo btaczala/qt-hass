@@ -21,8 +21,6 @@ Item {
         var height = 0;
         if (root.cards) {
             for (var entity of root.cards) {
-                console.log("BaseLayout: creatiing");
-                // var path = cardUrl(entity.type);
                 var path = "qrc:/qt-hass/qml/VisualItemBase.qml";
                 const component = Qt.createComponent(path);
                 if (component.status === Component.Ready) {

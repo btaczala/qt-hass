@@ -20,6 +20,10 @@ int main(int argc, char *argv[]) {
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
+  // QDirIterator it(":", QDirIterator::Subdirectories);
+  // while (it.hasNext()) {
+  //   qDebug() << it.next();
+  // }
 
   Controler controller;
   Hass hass;
