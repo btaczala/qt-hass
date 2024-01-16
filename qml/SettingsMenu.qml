@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Controls.Material
+import QtCore
 
 Pane {
     id: root
@@ -9,6 +10,7 @@ Pane {
 
     signal closed
     signal themeChanged(int index)
+    signal screenSaver(string screensaver)
 
     ColumnLayout {
         anchors.fill: parent
@@ -37,6 +39,44 @@ Pane {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 60
                     verticalAlignment: Text.AlignVCenter
+                    text: "Screensaver"
+                }
+
+                ComboBox {
+                    Layout.preferredHeight: 60
+                    model: ["Clock", "Black", "None"]
+
+                    Component.onCompleted: {
+                        var index = 0;
+                        for (var entry of model) {
+                            console.log(entry, AppSettings.currentScreenSaver)
+                            if (entry === AppSettings.currentScreenSaver) {
+                                console.log("setting currentIndex to", index);
+                                currentIndex = index;
+                                break;
+                            }
+                            index++;
+                        }
+                    }
+
+                    onActivated: {
+                        root.screenSaver(currentText);
+                    }
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: "black"
+                }
+                Rectangle {
+                    Layout.fillWidth: true
+                    height: 1
+                    color: "black"
+                }
+                Label {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 60
+                    verticalAlignment: Text.AlignVCenter
                     // horizontalAlignment: Text.AlignHCenter
                     text: "Theme"
                 }
@@ -44,6 +84,7 @@ Pane {
                 ComboBox {
                     Layout.preferredHeight: 60
                     model: ["Light", "Dark", "System"]
+
 
                     onActivated: {
                         root.themeChanged(currentIndex);
@@ -64,23 +105,13 @@ Pane {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 60
                     verticalAlignment: Text.AlignVCenter
-                    text: "Home Assistant addres"
+                    text: "Home Assistant address"
                 }
 
                 TextField {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 80
                     placeholderText: qsTr("Enter homeassistant address")
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: "black"
-                }
-                Rectangle {
-                    Layout.fillWidth: true
-                    height: 1
-                    color: "black"
                 }
                 Label {
                     Layout.fillWidth: true

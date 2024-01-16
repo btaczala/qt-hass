@@ -22,6 +22,7 @@ qt_standard_project_setup()
 
 qt_add_executable(appqt-hass main.cpp controller.cpp hass.cpp)
 qt_add_resources(appqt-hass PREFIX "/" FILES qtquickcontrols2.conf)
+set_source_files_properties(qml/AppSettings.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
 
 qt_add_qml_module(
   appqt-hass
@@ -31,12 +32,12 @@ qt_add_qml_module(
   1.0
   QML_FILES
   qml/Main.qml
-  qml/Clock.qml
   qml/Dashboard.qml
   qml/DetailsPopup.qml
   qml/EntityBase.qml
   qml/VisualItemBase.qml
-  qml/Settings.qml
+  qml/SettingsMenu.qml
+  qml/AppSettings.qml
   qml/Layouts/BaseLayout.qml
   qml/Layouts/VerticalStack.qml
   qml/Layouts/HorizontalStack.qml
@@ -54,13 +55,17 @@ qt_add_qml_module(
   qml/Components/Switch.qml
   qml/Test1.qml
   qml/Test2.qml
+  qml/Screensavers/Clock.qml
+  qml/Screensavers/Black.qml
   RESOURCES
   homekit-bg-blue-red.jpg
   qml/Hass.js
   images/lightbulb.svg
   images/drawer.svg
   images/menu.svg
-  images/lightbulb-off.svg)
+  images/lightbulb-off.svg
+  qml/qmldir
+  )
 
 set_target_properties(
   appqt-hass

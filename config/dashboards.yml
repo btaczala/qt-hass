@@ -27,10 +27,10 @@ views:
       #   entity: light.office_main_bulbs
       #   fill_container: true
 
-  # - name: Home
-  #   icon: https://api.iconify.design/ph/airplay-duotone.svg
-  #   type: GridStack
-  #   columns: 3
+  - name: Home
+    icon: https://api.iconify.design/ph/airplay-duotone.svg
+    type: GridStack
+    columns: 3
   #   cards:
   #     - type: Entity
   #       entity: light.wlacznik_lazienka_bisia

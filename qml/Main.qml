@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import "Hass.js" as HassLLApi
+import QtCore
 
 ApplicationWindow {
     id: window
@@ -14,6 +15,8 @@ ApplicationWindow {
 
     property var idleItem
 
+    Material.theme: Material.System
+
     Component.onCompleted: {
         HassLLApi.register_handler_for_state_updates(function (response) {
                 controller.hassApiRequestDataUpdated(response["entity_id"], response);
@@ -22,7 +25,7 @@ ApplicationWindow {
 
     Drawer {
         id: drawer
-        width: 0.66 * window.width
+        width: 0.3 * window.width
         height: window.height
 
         ColumnLayout {
@@ -56,15 +59,14 @@ ApplicationWindow {
 
                 Label {
                     anchors.fill: parent
-                    // horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    text: "About"
+                    text: "Screensaver"
                 }
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {
-                        aboutPopup.open();
                         drawer.close();
+                        window.idleItem = mainItem.push(idleComponent);
                     }
                 }
             }
@@ -78,13 +80,13 @@ ApplicationWindow {
                     anchors.fill: parent
                     // horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
-                    text: "Screensaver"
+                    text: "About"
                 }
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {
+                        aboutPopup.open();
                         drawer.close();
-                        window.idleItem = mainItem.push(idleComponent);
                     }
                 }
             }
@@ -147,7 +149,7 @@ ApplicationWindow {
 
     Component {
         id: settingsComponent
-        Settings {
+        SettingsMenu {
 
             onClosed: {
                 mainItem.pop();
@@ -157,25 +159,17 @@ ApplicationWindow {
                 console.log("Changing them to ", index);
                 window.Material.theme = index;
             }
+
+            onScreenSaver: function (label) {
+                AppSettings.currentScreenSaver = label;
+            }
         }
     }
     Component {
         id: idleComponent
-        Clock {
+        Loader {
+            source: "qrc:/qt-hass/qml/Screensavers/" + AppSettings.currentScreenSaver + ".qml"
         }
-    }
-
-    IconImage {
-        width: 32
-        height: 32
-        source: "qrc:/qt-hass/images/drawer.svg"
-        color: Material.foreground
-        MouseArea {
-            anchors.fill: parent
-            onClicked: drawer.open()
-        }
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
     }
 
     Connections {
@@ -224,4 +218,10 @@ ApplicationWindow {
         focus: true
         anchors.centerIn: parent
     }
+
+    // Settings {
+    //     id: settings
+    //     property alias screenSaver: window.currentScreenSaver
+    //     // property alias theme: Material.theme
+    // }
 }

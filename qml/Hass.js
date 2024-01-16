@@ -42,3 +42,7 @@ function request_update_state(entity_id) {
 function light_set_state(entity_id, state, callback) {
 }
 
+
+function light_update_brightness(entity_id, brightness) {
+                // TODO: Update brightness
+}

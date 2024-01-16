@@ -14,8 +14,12 @@
 
 int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
+  app.setOrganizationName("Qt HomeAssistant");
+  app.setOrganizationDomain("qt-hass.com");
+  app.setApplicationName("Qt HomeAssistant");
 
   QQmlApplicationEngine engine;
+
   const QUrl url(u"qrc:/qt-hass/qml/Main.qml"_qs);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,

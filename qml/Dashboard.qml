@@ -8,9 +8,18 @@ Item {
     width: 480
     height: 480
 
-    // property var rootObject
     property int tabBarHeight: 50
     property var configuration
+    property int click: 0
+
+    Timer {
+        id: resetTimer
+        interval: 5000
+        repeat: true
+        onTriggered: {
+            root.click = 0;
+        }
+    }
 
     Component {
         id: tabButton
@@ -23,6 +32,15 @@ Item {
                     sourceSize.width: 24
                     sourceSize.height: 24
                     color: "white"
+                }
+            }
+
+            onClicked: {
+                resetTimer.start();
+                root.click++;
+                if (root.click > 6) {
+                    AppSettings.showSettingDrawerIcon = !AppSettings.showSettingDrawerIcon;
+                    root.click = 0;
                 }
             }
         }
@@ -60,14 +78,34 @@ Item {
     ColumnLayout {
         anchors.fill: parent
 
-        TabBar {
-            id: tabBar
+        Item {
             Layout.fillWidth: true
             Layout.minimumHeight: root.tabBarHeight
             Layout.maximumHeight: root.tabBarHeight
-            Material.background: Material.Blue
-
             z: 99
+            RowLayout {
+                anchors.fill: parent
+                spacing: 0
+                Rectangle {
+                    visible: AppSettings.showSettingDrawerIcon
+                    Layout.fillHeight: true
+                    Layout.preferredWidth: 80
+                    color: Qt.rgba(128 / 255, 203 / 255, 196 / 255, 1)
+                    Button {
+                        id: control
+                        anchors.fill: parent
+                        flat: true
+                        icon.source: "qrc:/qt-hass/images/drawer.svg"
+                        onClicked: drawer.open()
+                    }
+                }
+                TabBar {
+                    id: tabBar
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    Material.background: Material.Teal
+                }
+            }
         }
         StackLayout {
             id: stackView

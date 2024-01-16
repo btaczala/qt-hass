@@ -29,15 +29,11 @@ Common.EntityBase {
             Components.Switch {
                 id: switchItem
                 anchors.centerIn: parent
-                // checked: root.entity_status["state"] === "on"
                 on_icon: "qrc:/qt-hass/images/lightbulb.svg"
                 off_icon: "qrc:/qt-hass/images/lightbulb-off.svg"
 
                 onToggled: {
                     stateLabel.text = switchItem.checked ? "on" : "off";
-                    // HassAPI.light_set_state(root.entity_id, checked, function (result) {
-                    //         console.log("Light: ", JSON.stringify(result));
-                    //     r);
                 }
             }
         }
