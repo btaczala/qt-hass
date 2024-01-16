@@ -1,0 +1,58 @@
+title: Main
+views:
+  - name: Home
+    icon: https://api.iconify.design/material-symbols/home-outline.svg
+    type: VerticalStack
+    cards:
+      - type: custom:mushroom-climate-card
+        entity: climate.145135534885144_climate
+        show_temperature_control: true
+        fill_container: true
+      - type: light 
+        entity: light.wlacznik_lazienka_bisia
+  #     - type: custom:mushroom-climate-card
+  #       entity: climate.145135534885144_climate
+  #       show_temperature_control: false
+  #       fill_container: true
+  #     # - type: horizontal-stack
+  #     #   height: 200
+  #     #   cards:
+  #     #   # - type: custom:mushroom-climate-card
+  #     #   #   entity: light.wlacznik_lazienka_bisia
+      - type: custom:mushroom-light-card
+        entity: light.office_main_bulbs
+        fill_container: true
+
+  - name: Home
+    icon: https://api.iconify.design/ph/airplay-duotone.svg
+    type: GridStack
+    columns: 3
+    cards:
+      - type: Entity
+        entity: light.wlacznik_lazienka_bisia
+      - type: Entity
+        entity: light.wlacznik_lazienka_bisia
+      - type: Entity
+        entity: light.wlacznik_lazienka_bisia
+      - type: Entity
+        entity: light.wlacznik_lazienka_bisia
+      - type: Entity
+        entity: light.wlacznik_lazienka_bisia
+  # - name: Home
+  #   icon: https://api.iconify.design/ph/airplay-duotone.svg
+  #   type: VerticalStack
+  #   cards:
+  #     - type: horizontal-stack
+  #       cards:
+  #         - show_name: true
+  #           show_icon: true
+  #           type: button
+  #           tap_action:
+  #             action: toggle
+  #           entity: light.shellycolorbulb_3494546ec62e
+  #         - show_name: true
+  #           show_icon: true
+  #           type: button
+  #           tap_action:
+  #             action: toggle
+  #           entity: light.shellycolorbulb_3494546ec62e
