@@ -17,8 +17,6 @@ class Controler : public QObject {
 public:
   Controler(QObject *parent = nullptr);
 
-  void init();
-
   QString configurationPath() const noexcept { return configuration_path_; }
 
   Q_INVOKABLE QUrl pathFor(const QString& file);

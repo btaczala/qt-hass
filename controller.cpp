@@ -39,25 +39,6 @@ Controler::Controler(QObject *parent)
   is_idle_timer_.setSingleShot(true);
 }
 
-void Controler::init() {
-  const auto res =
-      std::find_if(kPossibleConfigPaths.begin(), kPossibleConfigPaths.end(),
-                   [](const std::filesystem::path &p) {
-                     try {
-                       return std::filesystem::exists(p) &&
-                              std::filesystem::exists(p / "dashboards.yml");
-                     } catch (const std::exception &) {
-                       return false;
-                     }
-                   });
-
-  if (res != kPossibleConfigPaths.end())
-    loadConfig(std::filesystem::path{*res} / "dashboards.yml");
-  else {
-    loadConfig("bundle.yaml");
-  }
-}
-
 bool Controler::eventFilter(QObject *obj, QEvent *event) {
 
   if (event->type() == QEvent::TouchBegin ||

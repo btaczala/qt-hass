@@ -3,9 +3,9 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Effects
 import QtQuick.Controls.Material
-import "../Hass.js" as Hass
-import "../Components" as Components
-import ".."
+// import "../Hass.js" as Hass
+// import "../Components" as Components
+// import ".."
 
 EntityBase {
     id: root
@@ -54,9 +54,9 @@ EntityBase {
                 visible: false
                 live: false
 
-                onValueChanged: {
-                    Hass.light_update_brightness(entity_data.entity, dial.value);
-                }
+                // onValueChanged: {
+                //     Hass.light_update_brightness(entity_data.entity, dial.value);
+                // }
             }
             IconImage {
                 id: lightIcon
@@ -66,12 +66,12 @@ EntityBase {
                 anchors.centerIn: parent
                 MouseArea {
                     anchors.fill: parent
-                    onClicked: {
-                        Hass.light_toggle(entity_data.entity);
-                    }
-                    onPressAndHold: {
-                        controller.requestDetails(entity_data.entity, friendlyNameText.text);
-                    }
+                    // onClicked: {
+                    //     Hass.light_toggle(entity_data.entity);
+                    // }
+                    // onPressAndHold: {
+                    //     controller.requestDetails(entity_data.entity, friendlyNameText.text);
+                    // }
                 }
             }
         }

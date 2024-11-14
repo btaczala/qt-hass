@@ -3,11 +3,19 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 
+import QtHomeAssistant
+import HassAPI
+
 Rectangle {
-    color: "black"
+    color: "Green"
 
-    Component.onCompleted: console.log(controller)
+    Component.onCompleted:{
+        console.log(controller)
+        console.log(HassAPI.light_toggle(''))
+    }
 
-    Light {}
+    Light {
+        entity: "test123"
+    }
 }
 

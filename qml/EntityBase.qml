@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-import "Hass.js" as Hass
+// import "Hass.js" as Hass
 
 Item {
     id: root
@@ -31,8 +31,8 @@ Item {
         repeat: true
         triggeredOnStart: true
 
-        onTriggered: {
-            Hass.request_update_state(entity);
-        }
+        // onTriggered: {
+        //     Hass.request_update_state(entity);
+        // }
     }
 }
