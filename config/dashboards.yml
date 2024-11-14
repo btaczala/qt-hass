@@ -4,33 +4,57 @@ views:
     icon: https://api.iconify.design/material-symbols/home-outline.svg
     type: VerticalStack
     cards:
-      # - type: custom:mushroom-climate-card
-      #   entity: climate.145135534885144_climate
-      #   show_temperature_control: true
-      #   fill_container: true
-      - type: light 
-        entity: light.shellycolorbulb_3494546ee83b
-        name: Biuro
-      - type: light 
-        entity: light.wlacznik_lazienka_bisia
-        name: Bisiu
-  #     - type: custom:mushroom-climate-card
-  #       entity: climate.145135534885144_climate
-  #       show_temperature_control: false
+      - type: horizontal-stack
+        fill_container: true
+        cards:
+        - type: light 
+          entity: light.office_main_bulbs
+          name: Biuro
+          as_card: false
+        - type: light
+          entity: light.wlacznik_lazienka_bisia
+          name: Albert
+          as_card: false
+      - type: custom:mushroom-climate-card
+        entity: climate.145135534885144_climate
+        show_temperature_control: true
+        fill_container: true
+  #     - type: horizontal-stack
   #       fill_container: true
-  #     # - type: horizontal-stack
-  #     #   height: 200
-  #     #   cards:
-  #     #   # - type: custom:mushroom-climate-card
-  #     #   #   entity: light.wlacznik_lazienka_bisia
-      # - type: custom:mushroom-light-card
-      #   entity: light.office_main_bulbs
-      #   fill_container: true
-
-  - name: Home
-    icon: https://api.iconify.design/ph/airplay-duotone.svg
-    type: GridStack
-    columns: 3
+  #       cards:
+  #       - type: light 
+  #         entity: light.shellycolorbulb_3494546ee83b
+  #         name: Biuro
+  #         as_card: false
+  #       - type: light 
+  #         entity: light.shellycolorbulb_3494546ee83b
+  #         name: Biuro
+  #         as_card: false
+  #       - type: light 
+  #         entity: light.shellycolorbulb_3494546ee83b
+  #         name: Biuro
+  #         as_card: false
+  #     - type: horizontal-stack
+  #       fill_container: true
+  #       as_card: false
+  #       cards:
+  #       - type: light 
+  #         entity: light.shellycolorbulb_3494546ee83b
+  #         name: Biuro
+  #       - type: light 
+  #         entity: light.shellycolorbulb_3494546ee83b
+  #         name: Biuro
+  #       - type: light 
+  #         entity: light.shellycolorbulb_3494546ee83b
+  #         name: Biuro
+  #     - type: custom:mushroom-light-card
+  #       entity: light.office_main_bulbs
+  #       fill_container: true
+  #
+  # - name: Home
+  #   icon: https://api.iconify.design/ph/airplay-duotone.svg
+  #   type: GridStack
+  #   columns: 3
   #   cards:
   #     - type: Entity
   #       entity: light.wlacznik_lazienka_bisia

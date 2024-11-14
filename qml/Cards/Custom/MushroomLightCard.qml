@@ -15,7 +15,7 @@ Common.EntityBase {
     update: function (response) {
         if (!entity_data.name) {
             friendlyNameText.text = response["attributes"].friendly_name;
-            lightIcon.source = (response["state"] === "on" ? "qrc:/qt-hass/images/lightbulb.svg" : "qrc:/qt-hass/images/lightbulb-off.svg");
+            lightIcon.source = (response["state"] === "on" ? "qrc:/QtHass/images/lightbulb.svg" : "qrc:/QtHass/images/lightbulb-off.svg");
         }
     }
 

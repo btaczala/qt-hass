@@ -3,24 +3,30 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import "Hass.js" as HassLLApi
-import QtCore
+// import QtCore
+// import QtHassComponents as C
 
 ApplicationWindow {
     id: window
-    width: 480
-    height: 480
+    width: 800
+    height: 600
     visible: true
     title: qsTr("Hello World")
     visibility: platform == "android" ? Window.FullScreen : Window.Windowed // qmllint disable unqualified
 
     property var idleItem
 
-    Material.theme: Material.System
+    Material.theme: Material.Dark
 
     Component.onCompleted: {
         HassLLApi.register_handler_for_state_updates(function (response) {
                 controller.hassApiRequestDataUpdated(response["entity_id"], response);
             }, "Main.qml");
+    }
+
+    Image {
+        anchors.fill: parent
+        source: "qrc:/QtHass/homekit-bg-blue-red.jpg"
     }
 
     Drawer {
@@ -31,11 +37,10 @@ ApplicationWindow {
         ColumnLayout {
             anchors.fill: parent
 
-            Rectangle {
+            Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 Layout.leftMargin: 10
-                color: "transparent"
 
                 Label {
                     anchors.fill: parent
@@ -82,13 +87,6 @@ ApplicationWindow {
                     verticalAlignment: Text.AlignVCenter
                     text: "About"
                 }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: {
-                        aboutPopup.open();
-                        drawer.close();
-                    }
-                }
             }
 
             Rectangle {
@@ -103,7 +101,7 @@ ApplicationWindow {
         }
     }
 
-    Page {
+    Item {
         anchors.fill: parent
         StackView {
             id: mainItem
@@ -143,6 +141,7 @@ ApplicationWindow {
 
             initialItem: Loader {
                 id: dashboardLoader
+                source: "qrc:/QtHass/qml/Dashboard.qml"
             }
         }
     }
@@ -168,7 +167,7 @@ ApplicationWindow {
     Component {
         id: idleComponent
         Loader {
-            source: "qrc:/qt-hass/qml/Screensavers/" + AppSettings.currentScreenSaver + ".qml"
+            source: "qrc:/QtHass/qml/Screensavers/" + AppSettings.currentScreenSaver + ".qml"
         }
     }
 
@@ -191,7 +190,7 @@ ApplicationWindow {
 
         function onConfigurationChanged(configuration: var) {
             console.log("Dashboard: config changed");
-            dashboardLoader.setSource("qrc:/qt-hass/qml/Dashboard.qml", {
+            dashboardLoader.setSource("qrc:/QtHass/qml/Dashboard.qml", {
                     configuration: configuration
                 });
         }
@@ -199,7 +198,7 @@ ApplicationWindow {
 
     DetailsPopup {
         id: detailsPopup
-        opacity: 0.8
+        opacity: 0.4
         closePolicy: Popup.CloseOnPressOutside
         modal: true
         width: parent.width * 0.9
@@ -207,21 +206,4 @@ ApplicationWindow {
         focus: true
         anchors.centerIn: parent
     }
-
-    Popup {
-        id: aboutPopup
-        opacity: 0.8
-        closePolicy: Popup.CloseOnPressOutside
-        modal: true
-        width: parent.width * 0.9
-        height: parent.width * 0.9
-        focus: true
-        anchors.centerIn: parent
-    }
-
-    // Settings {
-    //     id: settings
-    //     property alias screenSaver: window.currentScreenSaver
-    //     // property alias theme: Material.theme
-    // }
 }

@@ -1,14 +1,12 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Controls.Material
 
 Item {
     id: root
 
     property var entity_data
-
-    Layout.fillWidth: true
-
 
     function cardUrl(card_type) {
         var split = card_type.split(":");
@@ -22,7 +20,7 @@ Item {
         } else {
             file_name = split[0].charAt(0).toUpperCase() + split[0].slice(1);
         }
-        return "qrc:/qt-hass/qml/Cards/ENTITY_TYPE.qml".replace("ENTITY_TYPE", file_name);
+        return "qrc:/QtHass/qml/Cards/ENTITY_TYPE.qml".replace("ENTITY_TYPE", file_name);
     }
 
     Flickable {
@@ -35,16 +33,25 @@ Item {
     }
 
     Component.onCompleted: {
+        var maxHeight = 0;
         for (var entity of entity_data.cards) {
-            var path = cardUrl(entity.type);
+            var path = "qrc:/QtHass/qml/VisualItemBase.qml";
+            // var path = cardUrl(entity.type);
             const component = Qt.createComponent(path);
             var children_local = entity.children;
             if (component.status === Component.Ready) {
                 const rootObject = component.createObject(layout, {
-                        entity_data: entity
+                        entity_data: entity,
+                        as_card: entity.as_card ? entity.as_card : true
                     });
-                // rootObject.width = layout.width / 4;
+                if (entity.height) {
+                    rootObject.height = entity.height;
+                }
                 rootObject.Layout.alignment = Qt.AlignVCenter;
+                if (rootObject.height > maxHeight) {
+                    maxHeight = rootObject.height;
+                    root.height = maxHeight;
+                }
             } else {
                 console.log("Horizontal: Unable to create component from url", path, " error=", component.errorString());
             }

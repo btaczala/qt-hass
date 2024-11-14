@@ -1,17 +1,21 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
+import QtQuick.Controls.Material
 
-Rectangle {
+Item {
     id: root
     property var entity_data
-    // color: Qt.rgba(54 / 255, 54 / 255, 54 / 255, 0.6)
-    height: loader.item ? loader.item.height : 0
+    property bool as_card: true
     width: loader.item ? loader.item.width : 0
-    color: "transparent"
-
-    border.color: "grey"
-
-    radius: 20
+    height: loader.item ? loader.item.height : 0
+    Rectangle {
+        color: Material.background
+        anchors.fill: parent
+        opacity: 0.4
+        visible: root.as_card
+        radius: 10
+    }
 
     function cardUrl(card_type) {
         var split = card_type.split(":");
@@ -25,7 +29,7 @@ Rectangle {
         } else {
             file_name = split[0].charAt(0).toUpperCase() + split[0].slice(1);
         }
-        return "qrc:/qt-hass/qml/Cards/ENTITY_TYPE.qml".replace("ENTITY_TYPE", file_name);
+        return "qrc:/QtHass/qml/Cards/ENTITY_TYPE.qml".replace("ENTITY_TYPE", file_name);
     }
 
     Loader {

@@ -5,6 +5,7 @@
 #include <QtCore/QObject>
 #include <QtCore/QTimer>
 #include <QtCore/QVariant>
+#include <QtCore/QUrl>
 
 #include <filesystem>
 
@@ -20,6 +21,8 @@ public:
 
   QString configurationPath() const noexcept { return configuration_path_; }
 
+  Q_INVOKABLE QUrl pathFor(const QString& file);
+
 protected:
   bool eventFilter(QObject *obj, QEvent *event) override;
 
@@ -30,6 +33,8 @@ signals:
   void idle(bool);
   void requestDetails(QString entity_id, QString friendly_name);
   void configurationChanged(QVariant configuration);
+
+  void error(QString);
 
   // HassAPI
   //

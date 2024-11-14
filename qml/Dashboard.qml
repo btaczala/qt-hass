@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtHass
 
 Item {
     id: root
@@ -11,6 +12,8 @@ Item {
     property int tabBarHeight: 50
     property var configuration
     property int click: 0
+
+    property var pages
 
     Timer {
         id: resetTimer
@@ -46,72 +49,17 @@ Item {
         }
     }
 
-    Component.onCompleted: {
-        if (configuration.views) {
-            for (var view of configuration.views) {
-                addDashboard(view);
-            }
-        }
+    // Loader {
+    //     source: controller.pathFor("default_dashboard/Dashboard.qml")
+    //     anchors.fill: parent
+    //
+    //     anchors.margins: 10
+    // }
+
+    Light {
+        width: 100
+        height: 100
+        entity: "light.office_main_bulbs"
     }
 
-    function addDashboard(yaml) {
-        var item = tabButton.createObject(tabBar, {
-                text: yaml.name,
-                height: root.tabBarHeight,
-                width: 48
-            });
-        tabBar.addItem(item);
-        if (yaml.icon)
-            item.icon.source = yaml.icon;
-        var url = "qrc:/qt-hass/qml/Layouts/STACK_VIEW.qml".replace('STACK_VIEW', yaml.type);
-        const component = Qt.createComponent(url);
-        if (component.status === Component.Ready) {
-            var rootObject = component.createObject(stackView, {
-                    cards: yaml.cards,
-                    entity_data: yaml
-                });
-        } else {
-            console.log("dashboard: unable to create ", url, " error = ", component.errorString());
-        }
-    }
-
-    ColumnLayout {
-        anchors.fill: parent
-
-        Item {
-            Layout.fillWidth: true
-            Layout.minimumHeight: root.tabBarHeight
-            Layout.maximumHeight: root.tabBarHeight
-            z: 99
-            RowLayout {
-                anchors.fill: parent
-                spacing: 0
-                Rectangle {
-                    visible: AppSettings.showSettingDrawerIcon
-                    Layout.fillHeight: true
-                    Layout.preferredWidth: 80
-                    color: Qt.rgba(128 / 255, 203 / 255, 196 / 255, 1)
-                    Button {
-                        id: control
-                        anchors.fill: parent
-                        flat: true
-                        icon.source: "qrc:/qt-hass/images/drawer.svg"
-                        onClicked: drawer.open()
-                    }
-                }
-                TabBar {
-                    id: tabBar
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    Material.background: Material.Teal
-                }
-            }
-        }
-        StackLayout {
-            id: stackView
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            currentIndex: tabBar.currentIndex
-        }
-    }
 }

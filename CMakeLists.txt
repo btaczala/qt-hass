@@ -5,29 +5,30 @@ project(
   VERSION 0.1
   LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-find_package(Qt6 6.6 REQUIRED COMPONENTS Quick QuickControls2 Charts)
-
-FetchContent_Declare(
-  yaml-cpp
-  GIT_REPOSITORY https://github.com/jbeder/yaml-cpp
-  GIT_TAG 0.8.0)
-FetchContent_MakeAvailable(yaml-cpp)
+find_package(Qt6 6.6 REQUIRED COMPONENTS Quick QuickControls2)
 
 qt_standard_project_setup()
 
 qt_add_executable(appqt-hass main.cpp controller.cpp hass.cpp)
-qt_add_resources(appqt-hass PREFIX "/" FILES qtquickcontrols2.conf)
-set_source_files_properties(qml/AppSettings.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
+set_source_files_properties(qml/AppSettings.qml PROPERTIES QT_QML_SINGLETON_TYPE
+                                                           TRUE)
+if(QT_KNOWN_POLICY_QTP0004)
+  qt_policy(SET QTP0004 NEW)
+endif()
+
+if(QT_KNOWN_POLICY_QTP0001)
+  qt_policy(SET QTP0001 NEW)
+endif()
 
 qt_add_qml_module(
   appqt-hass
   URI
-  qt-hass
+  QtHass
   VERSION
   1.0
   QML_FILES
@@ -53,6 +54,7 @@ qt_add_qml_module(
   qml/Details/Light.qml
   qml/Details/Climate.qml
   qml/Components/Switch.qml
+  qml/Components/BrightnessSlider.qml
   qml/Test1.qml
   qml/Test2.qml
   qml/Screensavers/Clock.qml
@@ -64,8 +66,11 @@ qt_add_qml_module(
   images/drawer.svg
   images/menu.svg
   images/lightbulb-off.svg
-  qml/qmldir
-  )
+  images/power.svg
+  images/power-off.svg
+  images/brightness.svg
+  RESOURCE_PREFIX
+  "/")
 
 set_target_properties(
   appqt-hass
@@ -78,8 +83,7 @@ set_target_properties(
 
 target_compile_definitions(appqt-hass
                            PRIVATE SOURCE_DIRECTORY=\"${CMAKE_SOURCE_DIR}\")
-target_link_libraries(appqt-hass PRIVATE Qt6::Quick Qt6::QuickControls2
-                                         yaml-cpp)
+target_link_libraries(appqt-hass PRIVATE Qt6::Quick Qt6::QuickControls2)
 
 include(GNUInstallDirs)
 install(

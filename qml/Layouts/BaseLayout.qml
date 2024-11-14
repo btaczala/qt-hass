@@ -21,11 +21,12 @@ Item {
         var height = 0;
         if (root.cards) {
             for (var entity of root.cards) {
-                var path = "qrc:/qt-hass/qml/VisualItemBase.qml";
+                var path = "qrc:/QtHass/qml/VisualItemBase.qml";
                 const component = Qt.createComponent(path);
                 if (component.status === Component.Ready) {
                     const rootObject = component.createObject(loader.item, {
-                            entity_data: entity
+                            entity_data: entity,
+                            as_card: entity.as_card ? entity.as_card : true
                         });
                     if (entity.fill_container) {
                         rootObject.Layout.fillWidth = true;

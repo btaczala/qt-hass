@@ -15,7 +15,7 @@ Pane {
     ColumnLayout {
         anchors.fill: parent
         TabBar {
-            Material.background: Material.Blue
+            Material.background: Material.Teal
             Layout.fillWidth: true
             // Layout.preferredHeight: 80
             TabButton {
@@ -49,7 +49,7 @@ Pane {
                     Component.onCompleted: {
                         var index = 0;
                         for (var entry of model) {
-                            console.log(entry, AppSettings.currentScreenSaver)
+                            console.log(entry, AppSettings.currentScreenSaver);
                             if (entry === AppSettings.currentScreenSaver) {
                                 console.log("setting currentIndex to", index);
                                 currentIndex = index;
@@ -84,7 +84,6 @@ Pane {
                 ComboBox {
                     Layout.preferredHeight: 60
                     model: ["Light", "Dark", "System"]
-
 
                     onActivated: {
                         root.themeChanged(currentIndex);

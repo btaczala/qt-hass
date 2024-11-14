@@ -5,10 +5,10 @@ import "Hass.js" as Hass
 
 Item {
     id: root
-    property var entity_data
+    required property var entity
 
     readonly property string entity_type: {
-        var str2 = entity_data.entity.split(".")[0];
+        var str2 = root.entity.split(".")[0];
         str2 = str2.charAt(0).toUpperCase() + str2.slice(1);
         return str2;
     }
@@ -19,8 +19,8 @@ Item {
         target: controller
 
         function onHassApiRequestDataUpdated(entity_id: string, entity_data: var) {
-            if (root.entity_data.entity === entity_data["entity_id"] && root.update) {
-                root.update(entity_data);
+            if (root.entity === entity_data["entity_id"] && root.update) {
+                root.update(entity);
             }
         }
     }
@@ -32,7 +32,7 @@ Item {
         triggeredOnStart: true
 
         onTriggered: {
-            Hass.request_update_state(entity_data.entity);
+            Hass.request_update_state(entity);
         }
     }
 }

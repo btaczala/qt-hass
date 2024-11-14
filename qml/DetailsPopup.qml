@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Controls.Material
 import "Hass.js" as Hass
 
 Popup {
@@ -12,7 +13,7 @@ Popup {
     function url(type: string, name: string) {
         var str2 = type.replace(' ', '');
         str2 = str2.charAt(0).toUpperCase() + str2.slice(1);
-        return "qrc:/qt-hass/qml/Details/CARD.qml".replace('CARD', str2);
+        return "qrc:/QtHass/qml/Details/CARD.qml".replace('CARD', str2);
     }
 
     function openDetails(entity_id: string, friendly_name: string) {

@@ -6,7 +6,7 @@ BaseLayout {
     id: root
 
     layout: ColumnLayout {
-        spacing: 10
+        spacing: 10 
         anchors.fill: parent
     }
 }

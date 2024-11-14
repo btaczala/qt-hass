@@ -20,14 +20,14 @@ int main(int argc, char *argv[]) {
 
   QQmlApplicationEngine engine;
 
-  const QUrl url(u"qrc:/qt-hass/qml/Main.qml"_qs);
+  const QUrl url(u"qrc:/QtHass/qml/Main.qml"_qs);
   QObject::connect(
       &engine, &QQmlApplicationEngine::objectCreationFailed, &app,
       []() { QCoreApplication::exit(-1); }, Qt::QueuedConnection);
-  // QDirIterator it(":", QDirIterator::Subdirectories);
-  // while (it.hasNext()) {
-  //   qDebug() << it.next();
-  // }
+  QDirIterator it(":", QDirIterator::Subdirectories);
+  while (it.hasNext()) {
+    qDebug() << it.next();
+  }
 
   Controler controller;
   Hass hass;
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
   engine.rootContext()->setContextProperty("hass", &hass);
   engine.rootContext()->setContextProperty("platform", QSysInfo::productType());
 
-  QQuickStyle::setStyle("Material");
+  // QQuickStyle::setStyle("Material");
 
   engine.load(url);
 

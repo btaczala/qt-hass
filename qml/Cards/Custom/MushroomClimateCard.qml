@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.Material
 import QtQuick.Layouts
 import QtQuick.Effects
 import "../../Hass.js" as Hass
@@ -31,7 +32,7 @@ EntityBase {
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.maximumHeight: 60
+                Layout.maximumHeight: 40
                 MouseArea {
                     anchors.fill: parent
                     onClicked: {
@@ -41,8 +42,9 @@ EntityBase {
                 RowLayout {
                     anchors.fill: parent
                     anchors.leftMargin: 10
+                    anchors.rightMargin: 10
                     IconImage {
-                        source: "qrc:/qt-hass/images/lightbulb-off.svg"
+                        source: "qrc:/QtHass/images/lightbulb-off.svg"
                         color: Material.foreground
                     }
 
@@ -77,7 +79,7 @@ EntityBase {
                 Item {
                     // radius: 10
                     anchors.fill: parent
-                    anchors.margins: 5
+                    anchors.margins: 20
                     RowLayout {
                         anchors.fill: parent
                         Button {
@@ -93,6 +95,12 @@ EntityBase {
                             Layout.fillHeight: true
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
+                            MouseArea {
+                                anchors.fill: parent
+                                onClicked: {
+                                    controller.requestDetails(entity_data.entity, friendlyNameText.text);
+                                }
+                            }
                         }
                         Button {
                             Layout.alignment: Qt.AlignVCenter

@@ -1,52 +1,22 @@
 #include "controller.h"
 
 #include <QtCore/QDateTime>
+#include <QtCore/QDir>
 #include <QtCore/QEvent>
+#include <QtCore/QFileInfo>
 #include <QtCore/QtDebug>
 
 #include <chrono>
-#include <iostream>
+#include <filesystem>
 #include <ranges>
 
-#include <yaml-cpp/yaml.h>
-
 namespace {
-const auto kDefaultIdleTimeout = std::chrono::seconds(15);
+const auto kDefaultIdleTimeout = std::chrono::seconds(60);
 const std::vector<std::filesystem::path> kPossibleConfigPaths{
     std::filesystem::path{std::filesystem::current_path() /
                           std::filesystem::path{"config"}},
     std::filesystem::path{SOURCE_DIRECTORY / std::filesystem::path{"config"}},
     std::filesystem::path{"/sdcard/Download/qt-hass/config"}};
-
-QVariant toVariant(YAML::Node node) {
-  switch (node.Type()) {
-  case YAML::NodeType::Undefined:
-  case YAML::NodeType::Null:
-  case YAML::NodeType::Scalar: {
-    return QString::fromStdString(node.as<std::string>());
-  }
-  case YAML::NodeType::Sequence: {
-    QVariantList list;
-    for (const auto node_entry : node) {
-      QVariant single_var = toVariant(node_entry);
-      list.append(single_var);
-    }
-    return list;
-
-    break;
-  }
-  case YAML::NodeType::Map: {
-    QVariantMap map;
-    for (YAML::const_iterator it = node.begin(); it != node.end(); ++it) {
-      map[QString::fromStdString(it->first.as<std::string>())] =
-          toVariant(it->second);
-    }
-    return map;
-  } break;
-  }
-
-  return QVariant{};
-}
 
 } // namespace
 
@@ -70,14 +40,22 @@ Controler::Controler(QObject *parent)
 }
 
 void Controler::init() {
-  const auto res = std::ranges::find_if(
-      kPossibleConfigPaths, [](const std::filesystem::path &p) {
-        return std::filesystem::exists(p) &&
-               std::filesystem::exists(p / "dashboards.yml");
-      });
+  const auto res =
+      std::find_if(kPossibleConfigPaths.begin(), kPossibleConfigPaths.end(),
+                   [](const std::filesystem::path &p) {
+                     try {
+                       return std::filesystem::exists(p) &&
+                              std::filesystem::exists(p / "dashboards.yml");
+                     } catch (const std::exception &) {
+                       return false;
+                     }
+                   });
 
   if (res != kPossibleConfigPaths.end())
     loadConfig(std::filesystem::path{*res} / "dashboards.yml");
+  else {
+    loadConfig("bundle.yaml");
+  }
 }
 
 bool Controler::eventFilter(QObject *obj, QEvent *event) {
@@ -95,20 +73,22 @@ bool Controler::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
-void Controler::loadConfig(const std::filesystem::path &path) {
-  qDebug() << "Loading file " << path.string();
-  YAML::Node config = YAML::LoadFile(path.string());
+void Controler::loadConfig(const std::filesystem::path &path) {}
 
-  if (config.IsNull()) {
-    qWarning() << "Unable to load " << path.string();
-    return;
+QUrl Controler::pathFor(const QString &config_path) {
+  const std::vector<std::filesystem::path> possibleRootPaths{
+      SOURCE_DIRECTORY, "/usr/share/qt-hass", "/sdcard/qt-hass"};
+
+  auto file_it = std::ranges::find_if(
+      possibleRootPaths, [config_path](const std::filesystem::path &path) {
+        return std::filesystem::exists(path / config_path.toStdString());
+      });
+
+  if (file_it == std::end(possibleRootPaths)) {
+    emit error(QString{"File %1 does not exists"}.arg(config_path));
+    return QUrl{};
   }
 
-  const auto v = toVariant(config);
-  Q_EMIT configurationChanged(v);
-
-  configuration_file_watcher_.addPath(QString::fromStdString(path.string()));
-
-  configuration_path_ = QString::fromStdString(path.string());
-  Q_EMIT configurationPathChanged();
+  return QUrl::fromLocalFile(
+      QString::fromStdString(*file_it / config_path.toStdString()));
 }

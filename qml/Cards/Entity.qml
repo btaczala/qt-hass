@@ -47,7 +47,7 @@ EntityBase {
                     }
 
                     IconImage {
-                        source: "qrc:/qt-hass/images/lightbulb-off.svg"
+                        source: "qrc:/QtHass/images/lightbulb-off.svg"
                         color: Material.foreground
                     }
                 }
