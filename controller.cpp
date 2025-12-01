@@ -6,10 +6,11 @@
 #include <QtCore/QFileInfo>
 #include <QtCore/QtDebug>
 
+#include <QtCore/qloggingcategory.h>
 #include <chrono>
 #include <filesystem>
-#include <ranges>
 
+Q_LOGGING_CATEGORY(controller, "qthass.controller")
 namespace {
 const auto kDefaultIdleTimeout = std::chrono::seconds(60);
 const std::vector<std::filesystem::path> kPossibleConfigPaths{
@@ -44,8 +45,7 @@ bool Controler::eventFilter(QObject *obj, QEvent *event) {
   if (event->type() == QEvent::TouchBegin ||
       event->type() == QEvent::KeyPress ||
       event->type() == QEvent::MouseButtonPress ||
-      event->type() == QEvent::MouseButtonDblClick ||
-      event->type() == QEvent::MouseMove) {
+      event->type() == QEvent::MouseButtonDblClick) {
     Q_EMIT idle(false);
     is_idle_timer_.start();
     has_user_interaction_ = true;

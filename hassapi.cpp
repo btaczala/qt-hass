@@ -24,7 +24,7 @@ const auto access_token =
 
 HassAPI::HassAPI(QObject *parent)
     : QObject(parent), socket_(new QWebSocket{}), url_(default_url),
-      subscription_id_(std::rand() % 100), connected_(false) {
+      connected_(false) {
   socket_->setParent(this);
 
   message_handlers_["auth_required"] = [this](QJsonDocument payload) {
@@ -38,13 +38,18 @@ HassAPI::HassAPI(QObject *parent)
   };
 
   message_handlers_["auth_ok"] = [this](QJsonDocument payload) {
+    qCInfo(hassAPI) << "Connected to " << url_;
+    connected_ = true;
+    emit connectedChanged();
+    subscribeForStateChanges();
     QTimer::singleShot(std::chrono::seconds(1), this, &HassAPI::refreshStates);
   };
 
-  message_handlers_["result"] =
-      std::bind(&HassAPI::handler_result, this, std::placeholders::_1);
+  message_handlers_["result"] = [this](QJsonDocument payload) {
+    resultHandler(payload);
+  };
   message_handlers_["event"] = [this](QJsonDocument payload) {
-    qCCritical(hassAPI) << "Not implemented" << payload;
+    eventHandler(payload);
   };
 
   QObject::connect(socket_, &QWebSocket::stateChanged,
@@ -66,7 +71,7 @@ HassAPI::HassAPI(QObject *parent)
       });
 
   QObject::connect(socket_, &QWebSocket::connected,
-                   []() { qCDebug(hassAPI()) << "Connected"; });
+                   []() { qCDebug(hassAPI()) << "Connected to web socket"; });
 }
 
 void HassAPI::connect() { socket_->open(url_); }
@@ -84,12 +89,14 @@ void HassAPI::registerStateChanges(QString entity_id, QJSValue fn) {
   } else {
     state_changed_entity_handlers_[entity_id] = QJSValueList{} << fn;
   }
+
+  refreshStates();
 }
 
-void HassAPI::subscribe() {
+void HassAPI::subscribeForStateChanges() {
   QJsonDocument resp_doc;
   QJsonObject resp_json;
-  resp_json["id"] = subscription_id_;
+  resp_json["id"] = request_id++;
   resp_json["type"] = QLatin1StringView{"subscribe_events"};
   resp_json["event_type"] = QLatin1StringView{"state_changed"};
   resp_doc.setObject(resp_json);
@@ -98,18 +105,36 @@ void HassAPI::subscribe() {
 }
 
 void HassAPI::refreshStates() {
-  get_states_id = std::rand() % 1000;
-  qCDebug(hassAPI) << "Getting all states";
+  qCDebug(hassAPI) << "Refresh states";
   QJsonDocument resp_doc;
   QJsonObject resp_json;
-  resp_json["id"] = get_states_id;
+  if (get_states_id_ != 0) {
+    qCInfo(hassAPI, "Already in progress, wont do anything; Sit tight");
+    return;
+  }
+  get_states_id_ = request_id++;
+  resp_json["id"] = get_states_id_.load();
   resp_json["type"] = QLatin1StringView{"get_states"};
   resp_doc.setObject(resp_json);
 
   socket_->sendTextMessage(resp_doc.toJson());
 }
 
-void HassAPI::handler_result(QJsonDocument payload) {
+void HassAPI::eventHandler(QJsonDocument payload) {
+  const auto entity_id = payload["event"]["data"]["entity_id"].toString();
+  if (state_changed_entity_handlers_.contains(entity_id)) {
+    const QJSValueList &callbacks =
+        state_changed_entity_handlers_.value(entity_id);
+    std::ranges::for_each(callbacks, [&payload](const QJSValue &callback) {
+      QJSValueList list;
+      list << QString{payload.toJson()};
+      qDebug() << "cb";
+      callback.call(list);
+    });
+  }
+}
+
+void HassAPI::resultHandler(QJsonDocument payload) {
   if (true) {
     QFile file{QString{"result_%1.json"}.arg(payload["id"].toInt())};
     if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
@@ -119,12 +144,7 @@ void HassAPI::handler_result(QJsonDocument payload) {
     file.close();
   }
 
-  if (payload["id"].toInt() == get_states_id) {
-    {
-      qCInfo(hassAPI) << "Connected to " << url_;
-      connected_ = true;
-      emit connectedChanged();
-    }
+  if (payload["id"].toInt() == get_states_id_.load()) {
     const auto &results = payload["result"].toArray();
 
     auto filtered = results | std::views::filter([this](const QJsonValue &val) {
@@ -143,7 +163,33 @@ void HassAPI::handler_result(QJsonDocument payload) {
         list << QString{doc.toJson()};
         callback.call(list);
       });
-      ;
     }
+    get_states_id_.store(0);
   }
+}
+
+void HassAPI::light(QString entity_id, bool on) {
+  QJsonDocument resp_doc;
+  QJsonObject resp_json;
+
+  request_id += 1;
+  const auto id = request_id;
+  resp_json["id"] = id;
+  resp_json["type"] = QLatin1StringView{"call_service"};
+  resp_json["domain"] = QLatin1StringView{"light"};
+  resp_json["service"] =
+      on ? QLatin1StringView{"turn_on"} : QLatin1StringView{"turn_off"};
+  QJsonObject data;
+  data["entity_id"] = entity_id;
+  resp_json["target"] = data;
+  resp_doc.setObject(resp_json);
+
+  // qCDebug(hassAPI) << "chaning light" << entity_id << "to " << on;
+
+  {
+    std::unique_lock<std::mutex> lock{requestMutex_};
+    requests_.insert(id, entity_id);
+  }
+
+  socket_->sendTextMessage(resp_doc.toJson());
 }

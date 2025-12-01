@@ -1,50 +1,56 @@
 {
   "event": {
     "context": {
-      "id": "01JCS1AY4F12XM6FWK2SRPKX99",
+      "id": "01KBD4PACY1F2ZBD9QQP29QVAY",
       "parent_id": null,
-      "user_id": null
+      "user_id": "756318e9146f4f6db5650f9aa9d91269"
     },
     "data": {
-      "entity_id": "sensor.dream_machine_pro_memory_utilization_2",
+      "entity_id": "light.nspanel_office_relay_1",
       "new_state": {
         "attributes": {
-          "friendly_name": "Dream Machine Pro Memory utilization",
-          "state_class": "measurement",
-          "unit_of_measurement": "%"
+          "color_mode": "onoff",
+          "friendly_name": "Biuro główne światło",
+          "supported_color_modes": [
+            "onoff"
+          ],
+          "supported_features": 0
         },
         "context": {
-          "id": "01JCS1AY4F12XM6FWK2SRPKX99",
+          "id": "01KBD4PACY1F2ZBD9QQP29QVAY",
           "parent_id": null,
-          "user_id": null
+          "user_id": "756318e9146f4f6db5650f9aa9d91269"
         },
-        "entity_id": "sensor.dream_machine_pro_memory_utilization_2",
-        "last_changed": "2024-11-15T23:08:08.207160+00:00",
-        "last_reported": "2024-11-15T23:08:08.207160+00:00",
-        "last_updated": "2024-11-15T23:08:08.207160+00:00",
-        "state": "66.4"
+        "entity_id": "light.nspanel_office_relay_1",
+        "last_changed": "2025-12-01T14:22:30.414980+00:00",
+        "last_reported": "2025-12-01T14:22:30.414980+00:00",
+        "last_updated": "2025-12-01T14:22:30.414980+00:00",
+        "state": "on"
       },
       "old_state": {
         "attributes": {
-          "friendly_name": "Dream Machine Pro Memory utilization",
-          "state_class": "measurement",
-          "unit_of_measurement": "%"
+          "color_mode": null,
+          "friendly_name": "Biuro główne światło",
+          "supported_color_modes": [
+            "onoff"
+          ],
+          "supported_features": 0
         },
         "context": {
-          "id": "01JCS1AWX2VX5ZF7VWJCPMK5SE",
+          "id": "01KBD4MV0RHCJQHHJJXHKZHJ4V",
           "parent_id": null,
-          "user_id": null
+          "user_id": "756318e9146f4f6db5650f9aa9d91269"
         },
-        "entity_id": "sensor.dream_machine_pro_memory_utilization_2",
-        "last_changed": "2024-11-15T23:08:06.946129+00:00",
-        "last_reported": "2024-11-15T23:08:06.946129+00:00",
-        "last_updated": "2024-11-15T23:08:06.946129+00:00",
-        "state": "66.5"
+        "entity_id": "light.nspanel_office_relay_1",
+        "last_changed": "2025-12-01T14:21:41.987791+00:00",
+        "last_reported": "2025-12-01T14:21:41.987791+00:00",
+        "last_updated": "2025-12-01T14:21:41.987791+00:00",
+        "state": "off"
       }
     },
     "event_type": "state_changed",
     "origin": "LOCAL",
-    "time_fired": "2024-11-15T23:08:08.207160+00:00"
+    "time_fired": "2025-12-01T14:22:30.414980+00:00"
   },
   "id": 7,
   "type": "event"

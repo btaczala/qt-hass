@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 23)
 
 find_package(
-  Qt6 6.2
+  Qt6 6.10
   COMPONENTS Gui Quick Multimedia WebSockets QuickControls2
   REQUIRED)
 
@@ -33,6 +33,9 @@ qt_add_qml_module(
   qml/main.qml
   qml/EntityBase.qml
   qml/Light.qml
+  qml/IconImage.qml
+  qml/Icon.js
+  qml/Cards/Weather.qml
   RESOURCES
   qtquickcontrols2.conf
   images/lightbulb.svg

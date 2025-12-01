@@ -4,19 +4,18 @@ import QtQuick.Layouts
 import QtQuick.Controls.Material
 
 import QtHomeAssistant
+import 'qrc:/res/QtHomeAssistant/qml/Cards'
 
 Item {
-
     Material.theme: Material.Dark
-
-    GridLayout {
-        columns: 3
+    RowLayout {
         anchors.fill: parent
         anchors.margins: 20
-        Light {
+        spacing: 5
+        Weather {
             Layout.preferredWidth: 200
             Layout.preferredHeight: 200
-            entity_id: "light.nspanel_office_relay_1"
+            entity_id: 'weather.forecast_home'
         }
         Light {
             Layout.preferredWidth: 200
@@ -26,9 +25,11 @@ Item {
         Light {
             Layout.preferredWidth: 200
             Layout.preferredHeight: 200
-            entity_id: "light.nspanel_office_relay_1"
+            entity_id: "light.swiatla_na_zewnatrz"
+        }
+        Item {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
         }
     }
-
-    Component.onCompleted: console.log(Material.theme)
 }

@@ -2,32 +2,38 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Controls.Material
+import QtHomeAssistant
 
 EntityBase {
     id: root
     property bool on: false
     update: function (response) {
-        console.log("Light.qml: response =", JSON.stringify(response));
         var j = JSON.parse(response);
-        root.entity_data = j;
-        friendlyNameText.text = j['attributes'].friendly_name;
-        root.on = (j["state"] === "on");
-        lightIcon.source = (root.on ? "qrc:/res/QtHomeAssistant/images/lightbulb.svg" : "qrc:/res/QtHomeAssistant/images/lightbulb-off.svg");
-        var color = j["attributes"].rgb_color;
-        if (color) {
-            lightIcon.color = Qt.rgba(color[0] / 255, color[1] / 255, color[2] / 255, 1);
-        }
 
-        // should we present dial
-        dial.visible = j["attributes"].supported_color_modes[0] !== "onoff";
-        if (j["attributes"].brightness) {
-            dial.visible = root.on;
-            if (!dial.pressed) {
-                dial.value = response["attributes"].brightness;
+        if (j['type'] === 'event') {
+            root.on = j['event']['data']['new_state']['state'] === 'on'
+        } else {
+            root.entity_data = j;
+            friendlyNameText.text = j['attributes'].friendly_name;
+            root.on = (j["state"] === "on");
+
+            var color = j["attributes"].rgb_color;
+            if (color) {
+                console.log('color', color)
+                lightIcon.color = Qt.rgba(color[0] / 255, color[1] / 255, color[2] / 255, 1);
             }
-        }
-        if (root.on) {} else {
-            lightIcon.color = Material.foreground;
+
+            // should we present dial
+            dial.visible = j["attributes"].supported_color_modes[0] !== "onoff";
+            if (j["attributes"].brightness) {
+                dial.visible = root.on;
+                if (!dial.pressed) {
+                    dial.value = response["attributes"].brightness;
+                }
+            }
+            if (root.on) {} else {
+                lightIcon.color = Material.foreground;
+            }
         }
     }
 
@@ -37,38 +43,18 @@ EntityBase {
             anchors.fill: parent
             anchors.bottomMargin: 10
 
-            Item {
+            Rectangle {
+                id: lightIcon
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Dial {
-                    id: dial
-                    anchors.fill: parent
-                    from: 0
-                    to: 255
-                    visible: false
-                    live: false
-                    value: 100
+                radius: 5
 
-                    // onValueChanged: {
-                    //     Hass.light_update_brightness(entity_data.entity, dial.value);
-                    // }
+                Image {
+                    sourceSize.width: 48
+                    sourceSize.height: 48
+                    anchors.centerIn: parent
+                    source: root.on ? "https://raw.githubusercontent.com/Templarian/MaterialDesign/refs/heads/master/svg/lightbulb-on.svg" : "https://raw.githubusercontent.com/Templarian/MaterialDesign/refs/heads/master/svg/lightbulb-off.svg"
                 }
-                // IconImage {
-                //     id: lightIcon
-                //     color: Material.foreground
-                //     sourceSize.width: 48
-                //     sourceSize.height: 48
-                //     anchors.centerIn: parent
-                //     MouseArea {
-                //         anchors.fill: parent
-                //         // onClicked: {
-                //         //     Hass.light_toggle(entity_data.entity);
-                //         // }
-                //         // onPressAndHold: {
-                //         //     controller.requestDetails(entity_data.entity, friendlyNameText.text);
-                //         // }
-                //     }
-                // }
             }
 
             Label {
@@ -78,6 +64,13 @@ EntityBase {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: root.entity_data ? root.entity_data['attributes'].friendly_name : root.entity_id
+            }
+        }
+        MouseArea {
+            anchors.fill: parent
+            onClicked: {
+                console.log('clicked light', root.entity_id);
+                HassAPI.light(root.entity_id, !root.on);
             }
         }
     }
