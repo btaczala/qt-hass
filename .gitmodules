@@ -1,0 +1,3 @@
+[submodule "3rdParty/custom-brand-icons"]
+	path = 3rdParty/custom-brand-icons
+	url = https://github.com/elax46/custom-brand-icons.git

@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD 23)
 
 find_package(
   Qt6 6.2
-  COMPONENTS Gui Quick Multimedia
+  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2
   REQUIRED)
 
 qt_add_executable(qthomeassistant src/main.cpp)
@@ -23,31 +23,35 @@ qt_add_qml_module(
   VERSION
   1.0
   RESOURCE_PREFIX
-  /qthomeassistant/imports
+  /res
   SOURCES
+  hassapi.h
+  hassapi.cpp
   controller.h
   controller.cpp
   QML_FILES
   qml/main.qml
   qml/EntityBase.qml
-  qml/Light.qml)
-
-add_subdirectory(HassAPI)
+  qml/Light.qml
+  RESOURCES
+  qtquickcontrols2.conf
+  images/lightbulb.svg
+  images/lightbulb-off.svg)
 
 set_target_properties(
   qthomeassistant
-  PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com
+  PROPERTIES MACOSX_BUNDLE_GUI_IDENTIFIER bartek.homeassistant
              MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-             MACOSX_BUNDLE_SHORT_VERSION_STRING
-             ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+             MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
              MACOSX_BUNDLE TRUE
              WIN32_EXECUTABLE TRUE)
 
-target_link_libraries(qthomeassistant PRIVATE Qt6::Gui Qt6::Quick
-                                              Qt6::Multimedia)
+add_subdirectory(3rdParty)
 
-target_compile_definitions(qthomeassistant
-                           PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}")
+target_link_libraries(qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
+                                              Qt6::QuickControls2)
+
+target_compile_definitions(qthomeassistant PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}")
 
 install(
   TARGETS qthomeassistant

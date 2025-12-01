@@ -1,38 +1,24 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
-// import "Hass.js" as Hass
+import QtQuick.Controls.Material
 
-Item {
+import QtHomeAssistant
+
+Pane {
     id: root
-    required property var entity
+    required property string entity_id
 
-    readonly property string entity_type: {
-        var str2 = root.entity.split(".")[0];
-        str2 = str2.charAt(0).toUpperCase() + str2.slice(1);
-        return str2;
-    }
+    width: 10
+    height: 10
 
     property var update
+    property var entity_data
 
-    Connections {
-        target: controller
+    Material.elevation: 4
+    Material.roundedScale: Material.SmallScale
 
-        function onHassApiRequestDataUpdated(entity_id: string, entity_data: var) {
-            if (root.entity === entity_data["entity_id"] && root.update) {
-                root.update(entity);
-            }
-        }
-    }
-
-    Timer {
-        running: true
-        interval: 1000
-        repeat: true
-        triggeredOnStart: true
-
-        // onTriggered: {
-        //     Hass.request_update_state(entity);
-        // }
+    Component.onCompleted: {
+        HassAPI.registerStateChanges(root.entity_id, root.update)
     }
 }

@@ -1,21 +1,34 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Controls.Material
 import QtQuick.Layouts
+import QtQuick.Controls.Material
 
 import QtHomeAssistant
-import HassAPI
 
-Rectangle {
-    color: "Green"
+Item {
 
-    Component.onCompleted:{
-        console.log(controller)
-        console.log(HassAPI.light_toggle(''))
+    Material.theme: Material.Dark
+
+    GridLayout {
+        columns: 3
+        anchors.fill: parent
+        anchors.margins: 20
+        Light {
+            Layout.preferredWidth: 200
+            Layout.preferredHeight: 200
+            entity_id: "light.nspanel_office_relay_1"
+        }
+        Light {
+            Layout.preferredWidth: 200
+            Layout.preferredHeight: 200
+            entity_id: "light.nspanel_office_relay_1"
+        }
+        Light {
+            Layout.preferredWidth: 200
+            Layout.preferredHeight: 200
+            entity_id: "light.nspanel_office_relay_1"
+        }
     }
 
-    Light {
-        entity: "test123"
-    }
+    Component.onCompleted: console.log(Material.theme)
 }
-

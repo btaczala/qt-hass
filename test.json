@@ -1,0 +1,51 @@
+{
+  "event": {
+    "context": {
+      "id": "01JCS1AY4F12XM6FWK2SRPKX99",
+      "parent_id": null,
+      "user_id": null
+    },
+    "data": {
+      "entity_id": "sensor.dream_machine_pro_memory_utilization_2",
+      "new_state": {
+        "attributes": {
+          "friendly_name": "Dream Machine Pro Memory utilization",
+          "state_class": "measurement",
+          "unit_of_measurement": "%"
+        },
+        "context": {
+          "id": "01JCS1AY4F12XM6FWK2SRPKX99",
+          "parent_id": null,
+          "user_id": null
+        },
+        "entity_id": "sensor.dream_machine_pro_memory_utilization_2",
+        "last_changed": "2024-11-15T23:08:08.207160+00:00",
+        "last_reported": "2024-11-15T23:08:08.207160+00:00",
+        "last_updated": "2024-11-15T23:08:08.207160+00:00",
+        "state": "66.4"
+      },
+      "old_state": {
+        "attributes": {
+          "friendly_name": "Dream Machine Pro Memory utilization",
+          "state_class": "measurement",
+          "unit_of_measurement": "%"
+        },
+        "context": {
+          "id": "01JCS1AWX2VX5ZF7VWJCPMK5SE",
+          "parent_id": null,
+          "user_id": null
+        },
+        "entity_id": "sensor.dream_machine_pro_memory_utilization_2",
+        "last_changed": "2024-11-15T23:08:06.946129+00:00",
+        "last_reported": "2024-11-15T23:08:06.946129+00:00",
+        "last_updated": "2024-11-15T23:08:06.946129+00:00",
+        "state": "66.5"
+      }
+    },
+    "event_type": "state_changed",
+    "origin": "LOCAL",
+    "time_fired": "2024-11-15T23:08:08.207160+00:00"
+  },
+  "id": 7,
+  "type": "event"
+}
