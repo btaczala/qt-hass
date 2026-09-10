@@ -21,15 +21,12 @@ int main(int argc, char *argv[]) {
   qSetMessagePattern(
       "[%{time process}][%{category}][%{type}][%{file}@%{line}] %{message}");
 
-  Controler *ctrl = new Controler{&engine};
   engine.addImportPath(":/res");
-  engine.rootContext()->setContextProperty("controller", ctrl);
-  QString platformName;
   engine.rootContext()->setContextProperty("platform", QSysInfo::productType());
   using namespace Qt::StringLiterals;
   engine.load(QUrl(u"qrc:/res/QtHomeAssistant/qml/main.qml"_s));
 
-  engine.rootObjects().at(0)->installEventFilter(ctrl);
+  engine.rootObjects().at(0)->installEventFilter(Controler::instance());
 
   return app.exec();
 }

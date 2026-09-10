@@ -11,6 +11,8 @@
 #include <filesystem>
 
 Q_LOGGING_CATEGORY(controller, "qthass.controller")
+
+Controler *Controler::s_instance = nullptr;
 namespace {
 const auto kDefaultIdleTimeout = std::chrono::seconds(60);
 const std::vector<std::filesystem::path> kPossibleConfigPaths{

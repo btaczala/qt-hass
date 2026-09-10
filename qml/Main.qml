@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import QtHomeAssistant
-import QtWebSockets
 
 ApplicationWindow {
     id: window
@@ -13,15 +12,21 @@ ApplicationWindow {
 
     Pane {
         anchors.fill: parent
+
+        Label {
+            text: "connecting..."
+            anchors.centerIn: parent
+
+        }
     }
 
     Loader {
         active: HassAPI.connected
         anchors.fill: parent
-        source: controller.pathFor("default_dashboard/Dashboard.qml")
+        source: Controler.pathFor("default_dashboard/Dashboard.qml")
     }
+
     Component.onCompleted: {
         HassAPI.connect();
     }
-
 }

@@ -23,14 +23,16 @@ EntityBase {
                 lightIcon.color = Qt.rgba(color[0] / 255, color[1] / 255, color[2] / 255, 1);
             }
 
-            // should we present dial
-            dial.visible = j["attributes"].supported_color_modes[0] !== "onoff";
-            if (j["attributes"].brightness) {
-                dial.visible = root.on;
-                if (!dial.pressed) {
-                    dial.value = response["attributes"].brightness;
-                }
-            }
+            // Brightness UI: `dial` is not declared anywhere in this file,
+            // so this threw ReferenceError and aborted the rest of update().
+            // Disabled until an actual Dial is added.
+            // dial.visible = j["attributes"].supported_color_modes[0] !== "onoff";
+            // if (j["attributes"].brightness) {
+            //     dial.visible = root.on;
+            //     if (!dial.pressed) {
+            //         dial.value = j["attributes"].brightness;
+            //     }
+            // }
             if (root.on) {} else {
                 lightIcon.color = Material.foreground;
             }
