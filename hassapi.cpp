@@ -249,25 +249,21 @@ void HassAPI::invokeCallbacks(const QString &entity_id,
   });
 }
 
+void HassAPI::callService(const QString &domain, const QString &service,
+                          const QString &entity_id,
+                          const QVariantMap &service_data) {
+  QJsonObject request;
+  request["id"] = request_id++;
+  request["type"] = QLatin1StringView{"call_service"};
+  request["domain"] = domain;
+  request["service"] = service;
+  request["target"] = QJsonObject{{"entity_id", entity_id}};
+  if (!service_data.isEmpty())
+    request["service_data"] = QJsonObject::fromVariantMap(service_data);
+
+  socket_->sendTextMessage(QJsonDocument{request}.toJson());
+}
+
 void HassAPI::light(QString entity_id, bool on) {
-  QJsonDocument resp_doc;
-  QJsonObject resp_json;
-
-  const auto id = request_id++;
-  resp_json["id"] = id;
-  resp_json["type"] = QLatin1StringView{"call_service"};
-  resp_json["domain"] = QLatin1StringView{"light"};
-  resp_json["service"] =
-      on ? QLatin1StringView{"turn_on"} : QLatin1StringView{"turn_off"};
-  QJsonObject data;
-  data["entity_id"] = entity_id;
-  resp_json["target"] = data;
-  resp_doc.setObject(resp_json);
-
-  {
-    std::unique_lock<std::mutex> lock{requestMutex_};
-    requests_.insert(id, entity_id);
-  }
-
-  socket_->sendTextMessage(resp_doc.toJson());
+  callService("light", on ? "turn_on" : "turn_off", entity_id);
 }

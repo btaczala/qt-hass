@@ -5,6 +5,7 @@ import QtQuick.Controls.Material
 
 import QtHomeAssistant
 import 'qrc:/res/QtHomeAssistant/qml/Cards'
+import 'qrc:/res/QtHomeAssistant/qml/Features'
 
 Item {
     Material.theme: Material.Dark
@@ -26,6 +27,27 @@ Item {
             Layout.preferredWidth: 200
             Layout.preferredHeight: 200
             entity_id: "light.swiatla_na_zewnatrz"
+        }
+        ColumnLayout {
+            Layout.preferredWidth: 250
+            Layout.alignment: Qt.AlignTop
+            spacing: 5
+            Tile {
+                Layout.fillWidth: true
+                entity_id: "switch.home_assistant_voice_09674a_mute"
+                features: [
+                    ToggleFeature {},
+                    LightBrightnessFeature {}
+                ]
+            }
+            Tile {
+                Layout.fillWidth: true
+                entity_id: "light.swiatla_na_zewnatrz"
+                features: [
+                    ToggleFeature {},
+                    LightBrightnessFeature {}
+                ]
+            }
         }
         Item {
             Layout.fillWidth: true

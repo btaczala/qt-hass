@@ -6,9 +6,9 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QObject>
 #include <QtCore/QSet>
+#include <QtCore/QVariantMap>
 
 #include <functional>
-#include <mutex>
 
 class QWebSocket;
 
@@ -32,6 +32,11 @@ public slots:
   void connect();
   void registerStateChanges(QString, QJSValue);
 
+  // Calls `domain.service` targeting `entity_id`, e.g.
+  // callService("light", "turn_on", "light.desk", {{"brightness_pct", 40}}).
+  void callService(const QString &domain, const QString &service,
+                   const QString &entity_id,
+                   const QVariantMap &service_data = {});
   void light(QString entity_id, bool on);
 
 signals:
@@ -58,8 +63,6 @@ private:
   // Latest full state per entity, rebuilt from HA's compressed diffs.
   QMap<QString, QJsonObject> entity_states_;
   QSet<QString> subscribed_entities_;
-  std::mutex requestMutex_;
-  QMap<int, QString> requests_;
   int request_id{1};
 };
 

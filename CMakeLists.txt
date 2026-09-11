@@ -65,10 +65,14 @@ qt_add_qml_module(
   qml/Main.qml
   qml/EntityBase.qml
   qml/Light.qml
+  qml/Tile.qml
+  qml/TileFeature.qml
   qml/MdiIcon.qml
   qml/IconImage.qml
   qml/Icon.js
   qml/Cards/Weather.qml
+  qml/Features/ToggleFeature.qml
+  qml/Features/LightBrightnessFeature.qml
   RESOURCES
   fonts/materialdesignicons-webfont.ttf
   images/lightbulb.svg
