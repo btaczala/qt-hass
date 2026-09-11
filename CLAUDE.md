@@ -11,12 +11,12 @@ Qt 6 / QML Home Assistant dashboard (`qthomeassistant`) that talks to HA over it
 Requires Qt ≥ 6.7 (Gui, Quick, QuickControls2, Multimedia, WebSockets), Python 3 (used at configure time), CMake, Ninja. The floor is 6.7, not something newer, specifically so Android builds can target Qt 6.7.x — see Android below for why.
 
 ```sh
-cmake -S . -B build/debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=$HOME/Qt/6.10.1/macos
-cmake --build build/debug
-cmake --build build/debug --target all_qmllint   # qmllint over the QML module
+cmake --preset desktop
+cmake --build --preset desktop
+cmake --build --preset desktop --target all_qmllint   # qmllint over the QML module
 ```
 
-On this machine a gitignored `CMakeUserPresets.json` provides `cmake --preset user-qt-debug` (same `build/debug` dir, which `.qmlls.ini` and the `compile_commands.json` symlink point at). Its `user-qt-release` preset names `~/Qt/6.7.0/gcc_64`, which doesn't exist here, so it silently configures against Homebrew Qt (`/opt/homebrew`) instead. If the Qt version matters, check `Qt6_DIR` in `CMakeCache.txt`.
+`CMakePresets.json` (committed) only defines hidden base presets (generator, `build/${presetName}` layout, common cache variables) -- it has no Qt paths, since those are machine-specific. `CMakeUserPresets.json` (gitignored) supplies the three concrete, buildable presets: `desktop`, `qt67`, and `qt6.10` (`cmake --list-presets` to see them; see Android below for the latter two). `desktop` overrides its `binaryDir` to `build/debug` specifically, since that's what `compile_commands.json` symlinks to. If `CMakeUserPresets.json` is ever missing, recreate `desktop` with `CMAKE_PREFIX_PATH` pointed at a Qt ≥ 6.7 macOS kit (`$HOME/Qt/6.10.1/macos` on this machine); if the Qt version matters, check `Qt6_DIR` in `CMakeCache.txt`.
 
 Run (macOS bundle). The app reads `HASS_URL` (e.g. `wss://host/api/websocket`; `ws://` for plain HTTP) and `HASS_TOKEN` (long-lived access token) from the environment. They live in `.envrc`, which contains the real token and is only kept out of git by a global ignore (the repo has no `.gitignore`). A non-interactive shell won't load it, so use:
 
@@ -45,26 +45,19 @@ ln -sfn /opt/homebrew/share/android-commandlinetools/ndk/26.1.10909125 "$ISO/ndk
 ln -sfn /opt/homebrew/share/android-commandlinetools/platforms/android-34 "$ISO/platforms/android-34"
 ```
 
-```sh
-export ANDROID_SDK_ROOT=$HOME/Android/sdk-compat-api34
-export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+Build with the `qt67` preset (`qt6.10` for the API 28+ kit -- same commands, just swap the preset name; it doesn't need the isolated SDK root, so it points `ANDROID_SDK_ROOT` straight at `/opt/homebrew/share/android-commandlinetools`):
 
-cmake -S . -B build/android-arm64-qt67 -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$HOME/Qt/6.7.3/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake" \
-  -DQT_HOST_PATH="$HOME/Qt/6.7.3/macos" \
-  -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
-  -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
-  -DCMAKE_PREFIX_PATH="$HOME/Qt/6.7.3/android_arm64_v8a" \
-  -DQT_ANDROID_ABIS=arm64-v8a \
-  -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/android-arm64-qt67 --target apk
-cmake --build build/android-arm64-qt67 --target run   # install + launch on whatever device adb targets
+```sh
+cmake --preset qt67
+cmake --build --preset qt67 --target apk
+cmake --build --preset qt67 --target run   # install + launch on whatever device adb targets
 ```
+
+The `qt67`/`qt6.10` presets in `CMakeUserPresets.json` set `toolchainFile`, `QT_HOST_PATH`, `CMAKE_PREFIX_PATH`, `ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT` (as both `environment` and `cacheVariables`, since `CMakeLists.txt`'s `run` target reads it from the environment while CMake's own Android tooling reads the cache variable) and `JAVA_HOME` (environment only) for their respective kit; `binaryDir` is pinned to `build/android-arm64-qt67` / `build/android-arm64` rather than the presets' default `build/${presetName}`, to match the paths used below and elsewhere in this doc.
 
 `run` (added to `CMakeLists.txt`, `ANDROID`-only) depends on `qthomeassistant_make_apk`, so it builds first if needed; it shells out to `adb`, located via `ANDROID_SDK_ROOT/platform-tools` or `PATH`. The APK it installs is the stable `android-build/qthomeassistant.apk` androiddeployqt copies its final output to (`${apk_final_dir}/${target}.apk`, not the deeper `android-build/build/outputs/apk/debug/android-build-debug.apk` gradle path, which is more of an implementation detail). It hardcodes the package name (`org.qtproject.example.qthomeassistant`, androiddeployqt's default since nothing sets `QT_ANDROID_PACKAGE_NAME`) — update it there if that's ever set explicitly.
 
-The AVD (`qthass`, Pixel 6 profile, `system-images;android-34;google_apis;arm64-v8a`) was created with `avdmanager create avd`; `avdmanager list avd`'s `devices.xml` lookup errors on this SDK layout but the AVD still gets created fine. Launch with `emulator -avd qthass`, then `cmake --build build/android-arm64-qt67 --target run`, or by hand:
+The AVD (`qthass`, Pixel 6 profile, `system-images;android-34;google_apis;arm64-v8a`) was created with `avdmanager create avd`; `avdmanager list avd`'s `devices.xml` lookup errors on this SDK layout but the AVD still gets created fine. Launch with `emulator -avd qthass`, then `cmake --build --preset qt67 --target run` (it's API 34, so `qt6.10` works too), or by hand:
 
 ```sh
 adb install -r build/android-arm64-qt67/android-build/qthomeassistant.apk
