@@ -137,7 +137,7 @@ void HassAPI::registerStateChanges(QString entity_id, QJSValue fn) {
     return;
   }
 
-  qCInfo(hassAPI) << "Registering callback for" << entity_id;
+  qCDebug(hassAPI) << "Registering callback for" << entity_id;
 
   if (state_changed_entity_handlers_.contains(entity_id)) {
     auto &list = state_changed_entity_handlers_[entity_id];
@@ -173,7 +173,7 @@ void HassAPI::unregisterStateChanges(QString entity_id, QJSValue fn) {
   if (it == state_changed_entity_handlers_.end())
     return;
 
-  qCInfo(hassAPI) << "Unregistering callback for" << entity_id;
+  qCDebug(hassAPI) << "Unregistering callback for" << entity_id;
 
   QJSValueList &callbacks = it.value();
   for (qsizetype i = callbacks.size() - 1; i >= 0; --i) {

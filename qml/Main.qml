@@ -10,12 +10,12 @@ ApplicationWindow {
     title: qsTr("Hello World")
     visibility: platform == "android" ? Window.FullScreen : Window.Windowed // qmllint disable unqualified
 
-    Pane {
-        anchors.fill: parent
+    // No Pane here: its opaque background would hide this one.
+    background: AnimatedBackground {}
 
-        BusyIndicator {
-            anchors.centerIn: parent
-        }
+    BusyIndicator {
+        anchors.centerIn: parent
+        visible: !HassAPI.connected
     }
 
     Loader {

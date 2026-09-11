@@ -15,6 +15,10 @@ import QtHomeAssistant
 //
 // Tapping the icon toggles entities that can be toggled; tapping anywhere else
 // asks for the entity's details, like Lovelace's more-info.
+//
+// The implicit height fits every supported feature stacked below the header.
+// Given less height than that, the tile switches to Lovelace's inline layout:
+// the first supported feature moves into the header row and the rest hide.
 EntityBase {
     id: root
 
@@ -32,6 +36,9 @@ EntityBase {
     // declaration syntax and runtime behavior -- JS property assignment on
     // each element still works via its actual TileFeature-derived type.
     property list<Item> features
+
+    // Gap above each stacked feature, and beside an inline one.
+    readonly property real featureSpacing: 12
 
     readonly property string domain: root.entity_id.split(".")[0]
     readonly property var attributes: root.entity_data?.attributes ?? ({})
@@ -83,6 +90,35 @@ EntityBase {
         return unit ? qsTr("%1 %2").arg(label).arg(unit) : label;
     }
 
+    // Height every supported feature needs stacked below the header. It must
+    // not depend on the inline layout: height defaults to implicitHeight, so a
+    // layout-dependent value here would lock a tile into inline mode or make
+    // it flip back and forth. Hence featureSpacing, not each Layout.topMargin.
+    readonly property real featuresHeight: {
+        let height = 0;
+        for (let i = 0; i < root.features.length; ++i) {
+            if (root.features[i].supported)
+                height += root.featureSpacing + root.features[i].implicitHeight;
+        }
+        return height;
+    }
+
+    // The 1px slack absorbs layouts rounding a fractional implicit height down.
+    readonly property bool inlineFeatures: !root.vertical && root.height < root.implicitHeight - 1
+    readonly property Item inlineFeature: {
+        if (!root.inlineFeatures)
+            return null;
+        for (let i = 0; i < root.features.length; ++i) {
+            if (root.features[i].supported)
+                return root.features[i];
+        }
+        return null;
+    }
+
+    // False until every feature knows its tile: assigning `tile` changes
+    // `supported`, which must not re-enter placeFeatures() halfway through.
+    property bool featuresReady: false
+
     function setOn(on) {
         HassAPI.callService(root.domain, on ? "turn_on" : "turn_off", root.entity_id);
     }
@@ -95,13 +131,38 @@ EntityBase {
         Controler.requestDetails(root.entity_id, root.displayName);
     }
 
+    function placeFeatures() {
+        const targets = [];
+        let moved = false;
+        for (let i = 0; i < root.features.length; ++i) {
+            targets.push(root.features[i] === root.inlineFeature ? topRow : content);
+            moved = moved || root.features[i].parent !== targets[i];
+        }
+        if (!moved)
+            return;
+
+        // Re-append all of them in declaration order: a feature returning from
+        // the header row would otherwise land after the others.
+        for (let i = 0; i < root.features.length; ++i) {
+            root.features[i].parent = null;
+            root.features[i].parent = targets[i];
+        }
+    }
+
     update: function (response) {
         root.entity_data = JSON.parse(response);
     }
 
     width: implicitWidth
     height: implicitHeight
+    contentWidth: header.implicitWidth
+    contentHeight: header.implicitHeight + root.featuresHeight
     Material.roundedScale: Material.MediumScale
+
+    onInlineFeatureChanged: {
+        if (root.featuresReady)
+            root.placeFeatures();
+    }
 
     TapHandler {
         onTapped: root.moreInfo()
@@ -112,62 +173,69 @@ EntityBase {
         anchors.fill: parent
         spacing: 0
 
-        GridLayout {
+        RowLayout {
+            id: topRow
             Layout.fillWidth: true
-            columns: root.vertical ? 1 : 2
-            columnSpacing: 10
-            rowSpacing: 6
+            spacing: root.featureSpacing
 
-            Rectangle {
-                Layout.preferredWidth: 40
-                Layout.preferredHeight: 40
-                Layout.alignment: Qt.AlignCenter
-                radius: 20
-                color: Qt.rgba(root.stateColor.r, root.stateColor.g, root.stateColor.b, 0.2)
-
-                MdiIcon {
-                    anchors.centerIn: parent
-                    icon: root.resolvedIcon
-                    color: root.stateColor
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.toggleable ? root.toggle() : root.moreInfo()
-                }
-            }
-
-            ColumnLayout {
+            GridLayout {
+                id: header
                 Layout.fillWidth: true
-                spacing: 0
+                columns: root.vertical ? 1 : 2
+                columnSpacing: 10
+                rowSpacing: 6
 
-                Label {
-                    Layout.fillWidth: true
-                    text: root.displayName
-                    font.pixelSize: 14
-                    font.weight: Font.Medium
-                    elide: Text.ElideRight
-                    horizontalAlignment: root.vertical ? Text.AlignHCenter : Text.AlignLeft
+                Rectangle {
+                    Layout.preferredWidth: 40
+                    Layout.preferredHeight: 40
+                    Layout.alignment: Qt.AlignCenter
+                    radius: 20
+                    color: Qt.rgba(root.stateColor.r, root.stateColor.g, root.stateColor.b, 0.2)
+
+                    MdiIcon {
+                        anchors.centerIn: parent
+                        icon: root.resolvedIcon
+                        color: root.stateColor
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.toggleable ? root.toggle() : root.moreInfo()
+                    }
                 }
 
-                Label {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    visible: !root.hideState
-                    text: root.stateDisplay
-                    font.pixelSize: 12
-                    color: root.Material.secondaryTextColor
-                    elide: Text.ElideRight
-                    horizontalAlignment: root.vertical ? Text.AlignHCenter : Text.AlignLeft
+                    spacing: 0
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: root.displayName
+                        font.pixelSize: 14
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                        horizontalAlignment: root.vertical ? Text.AlignHCenter : Text.AlignLeft
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        visible: !root.hideState
+                        text: root.stateDisplay
+                        font.pixelSize: 12
+                        color: root.Material.secondaryTextColor
+                        elide: Text.ElideRight
+                        horizontalAlignment: root.vertical ? Text.AlignHCenter : Text.AlignLeft
+                    }
                 }
             }
         }
     }
 
     Component.onCompleted: {
-        for (let i = 0; i < root.features.length; ++i) {
+        for (let i = 0; i < root.features.length; ++i)
             root.features[i].tile = root;
-            root.features[i].parent = content;
-        }
+        root.featuresReady = true;
+        root.placeFeatures();
     }
 }

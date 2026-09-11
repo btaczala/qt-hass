@@ -25,6 +25,11 @@ Item {
         Light {
             Layout.preferredWidth: 200
             Layout.preferredHeight: 200
+            entity_id: "light.ledy_biuro"
+        }
+        Light {
+            Layout.preferredWidth: 200
+            Layout.preferredHeight: 200
             entity_id: "light.swiatla_na_zewnatrz"
         }
         ColumnLayout {

@@ -34,7 +34,7 @@ Item {
                     required property int index
 
                     width: 220
-                    height: 90
+                    height: 200
                     entity_id: root.entityIds[index % root.entityIds.length]
                     features: [
                         ToggleFeature {},

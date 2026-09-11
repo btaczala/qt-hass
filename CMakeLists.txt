@@ -63,6 +63,7 @@ qt_add_qml_module(
   src/mdi.cpp
   QML_FILES
   qml/Main.qml
+  qml/AnimatedBackground.qml
   qml/EntityBase.qml
   qml/Light.qml
   qml/Tile.qml

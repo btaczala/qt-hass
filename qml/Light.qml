@@ -19,12 +19,15 @@ EntityBase {
 
             var color = j["attributes"].rgb_color;
             if (color) {
-                console.log('color', color);
                 lightIcon.color = Qt.rgba(color[0] / 255, color[1] / 255, color[2] / 255, 1);
+                console.warn(lightIcon.color)
             }
-
-            if (root.on) {} else {
-                lightIcon.color = Material.foreground;
+            else {
+                if (root.on) {
+                    lightIcon.color = "yellow";
+                } else {
+                    lightIcon.color = Material.foreground;
+                }
             }
         }
     }
@@ -36,12 +39,12 @@ EntityBase {
             anchors.bottomMargin: 10
 
             Rectangle {
-                id: lightIcon
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                radius: 5
+                color: "transparent"
 
                 MdiIcon {
+                    id: lightIcon
                     anchors.centerIn: parent
                     iconSize: 48
                     icon: root.on ? "mdi:lightbulb-on" : "mdi:lightbulb-off"
@@ -51,7 +54,6 @@ EntityBase {
             Label {
                 id: friendlyNameText
                 Layout.fillWidth: true
-                // text: entity_data.name ? entity_data.name : root.entity_data.entity
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 text: root.entity_data ? root.entity_data['attributes'].friendly_name : root.entity_id
