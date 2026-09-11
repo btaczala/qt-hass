@@ -165,11 +165,20 @@ if(ANDROID)
               --package ${ANDROID_PACKAGE_NAME}
               --out "${CMAKE_CURRENT_BINARY_DIR}/config"
               --adb ${ADB_EXECUTABLE}
+      # Controler::pathFor()'s /sdcard/qt-hass fallback (see qml/Main.qml) is
+      # the only one of its three search paths that exists on-device --
+      # SOURCE_DIRECTORY is baked in at compile time as this machine's path,
+      # and /usr/share/qt-hass is a desktop-only convention. Unlike the config
+      # above, /sdcard is plain external storage: no run-as needed, and it
+      # doesn't require the app to already be installed.
+      COMMAND ${ADB_EXECUTABLE} shell mkdir -p /sdcard/qt-hass
+      COMMAND ${ADB_EXECUTABLE} push "${CMAKE_CURRENT_SOURCE_DIR}/default_dashboard"
+              /sdcard/qt-hass/
       COMMAND ${ADB_EXECUTABLE} shell am start -n
               ${ANDROID_PACKAGE_NAME}/org.qtproject.qt.android.bindings.QtActivity
       DEPENDS qthomeassistant_make_apk
       USES_TERMINAL
-      COMMENT "Installing qthomeassistant, pushing its config, and launching it on the connected Android device")
+      COMMENT "Installing qthomeassistant, pushing its config and dashboard, and launching it on the connected Android device")
   else()
     message(
       WARNING
