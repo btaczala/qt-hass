@@ -89,8 +89,6 @@ set_target_properties(
              MACOSX_BUNDLE TRUE
              WIN32_EXECUTABLE TRUE)
 
-add_subdirectory(3rdParty)
-
 target_link_libraries(
   qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
                           Qt6::QuickControls2)
