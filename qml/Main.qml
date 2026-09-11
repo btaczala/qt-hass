@@ -13,10 +13,8 @@ ApplicationWindow {
     Pane {
         anchors.fill: parent
 
-        Label {
-            text: "connecting..."
+        BusyIndicator {
             anchors.centerIn: parent
-
         }
     }
 

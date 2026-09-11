@@ -31,6 +31,11 @@ public:
 public slots:
   void connect();
   void registerStateChanges(QString, QJSValue);
+  // Must be called with the exact same (entity_id, fn) pair passed to
+  // registerStateChanges before the QML object owning fn is destroyed --
+  // otherwise the stale closure stays in state_changed_entity_handlers_ and
+  // the next state update for that entity calls into a deleted object.
+  void unregisterStateChanges(QString, QJSValue);
 
   // Calls `domain.service` targeting `entity_id`, e.g.
   // callService("light", "turn_on", "light.desk", {{"brightness_pct", 40}}).

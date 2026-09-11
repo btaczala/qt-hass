@@ -88,6 +88,14 @@ See `Controler` below for why `/data/user/0/.../files` and not `/sdcard`.
 
 Cards extend `qml/EntityBase.qml`: set `required property string entity_id` and assign the `update` function property, which EntityBase registers with `HassAPI` in `Component.onCompleted`. See `qml/Light.qml` and `qml/Cards/Weather.qml`.
 
+`qml/Tile.qml` (a Lovelace-style tile card) takes a `features` list of `qml/TileFeature.qml`-derived items (`qml/Features/ToggleFeature.qml`, `qml/Features/LightBrightnessFeature.qml`). That property is declared `list<Item>`, not `list<TileFeature>` -- confirmed on-device that `list<TileFeature>` makes the whole `Tile` type unavailable at runtime on Android (`Type Tile unavailable`, even for a bare `Tile{}` with no `features` set) while working fine on desktop. `list<Item>` keeps the same `features: [A{}, B{}]` declaration syntax and runtime behavior (JS property assignment on each element still goes through its real `TileFeature`-derived type), so don't "fix" it back to `list<TileFeature>`.
+
+### Multi-page dashboards (TabBar + StackView)
+
+`default_dashboard/Dashboard.qml` is a `TabBar`-over-`StackView` shell; each tab is a sibling `.qml` file in `default_dashboard/` (`PageOverview.qml`, `PageTiles.qml`, `PageLights.qml`), loaded via `Qt.createComponent(Qt.resolvedUrl("PageX.qml"))` + `stackView.replace(null, component)` rather than `StackView.initialItem`/a bare url. `initialItem` set to a dynamically-resolved url silently pushed nothing in testing (no error, no content, page just stayed blank) -- `Qt.createComponent` with explicit `component.status`/`errorString()` checking is what actually surfaces load failures (which is how the `list<Item>` bug above and a `qrc:/.../Features` stale-build issue got caught at all). Add a page by dropping a new file next to `Dashboard.qml` and listing it in `pages`.
+
+The `TabBar` is docked at the **top**, not the bottom: confirmed on a real device (Fire tablet, Android 9) that Android's immersive-sticky navigation bar lives at the bottom edge and reappears on a touch there even in a fullscreen app, swallowing the first tap into the OS home/back/recents bar instead of the app underneath. A bottom-docked TabBar was unreliable to tap at all; top placement doesn't have this problem.
+
 ### MDI table generation
 
 `tools/generate_mdi_table.py` runs at **configure time** (`execute_process`) and writes `build/*/generated/mdi_icons_data.h`, a sorted name→codepoint table. It is generated, never committed. It cross-checks every codepoint against the font's cmap and fails configure on mismatch. Its inputs `fonts/materialdesignicons-webfont.ttf` and `fonts/materialdesignicons-meta.json` are vendored. To upgrade MDI (the only networked step): `python3 tools/generate_mdi_table.py --fetch <version>`. Currently 7.4.47.

@@ -151,12 +151,38 @@ void HassAPI::registerStateChanges(QString entity_id, QJSValue fn) {
 
   if (subscribed_entities_.contains(entity_id)) {
     // Already streaming this entity; replay the state we last saw so the
-    // new callback isn't left blank until the next change.
+    // new callback isn't left blank until the next change. Queued, not
+    // called straight away: registerStateChanges() is typically called from
+    // a QML component's Component.onCompleted, and a batch of many at once
+    // (e.g. a Repeater instantiating dozens of Tile{}) means this runs
+    // while the QML engine is still mid-incubation of that batch. Calling
+    // back into JS (invokeCallbacks ultimately does QJSValue::call) from
+    // there re-enters the engine during object construction, which crashed
+    // its GC on-device after enough accumulated objects.
     if (entity_states_.contains(entity_id))
-      invokeCallbacks(entity_id, {fn});
+      QMetaObject::invokeMethod(
+          this, [this, entity_id, fn]() { invokeCallbacks(entity_id, {fn}); },
+          Qt::QueuedConnection);
   } else {
     subscribeToEntity(entity_id);
   }
+}
+
+void HassAPI::unregisterStateChanges(QString entity_id, QJSValue fn) {
+  const auto it = state_changed_entity_handlers_.find(entity_id);
+  if (it == state_changed_entity_handlers_.end())
+    return;
+
+  qCInfo(hassAPI) << "Unregistering callback for" << entity_id;
+
+  QJSValueList &callbacks = it.value();
+  for (qsizetype i = callbacks.size() - 1; i >= 0; --i) {
+    if (callbacks.at(i).strictlyEquals(fn))
+      callbacks.removeAt(i);
+  }
+
+  if (callbacks.isEmpty())
+    state_changed_entity_handlers_.erase(it);
 }
 
 void HassAPI::subscribeToEntity(const QString &entity_id) {

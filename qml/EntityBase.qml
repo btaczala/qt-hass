@@ -21,4 +21,11 @@ Pane {
     Component.onCompleted: {
         HassAPI.registerStateChanges(root.entity_id, root.update)
     }
+
+    // Without this, a destroyed card (e.g. a StackView page switch) leaves
+    // its callback registered forever -- the next state update for this
+    // entity then calls into a deleted object.
+    Component.onDestruction: {
+        HassAPI.unregisterStateChanges(root.entity_id, root.update)
+    }
 }

@@ -25,7 +25,13 @@ EntityBase {
     property bool vertical: false
     property bool hideState: false
 
-    property list<TileFeature> features
+    // list<Item> here, not list<TileFeature>: a list of TileFeature (a
+    // composite QML type, not a C++-registered one) makes the Tile type
+    // unavailable at all on Android, even though the identical module works
+    // fine on desktop. list<Item> keeps the same `features: [A{}, B{}]`
+    // declaration syntax and runtime behavior -- JS property assignment on
+    // each element still works via its actual TileFeature-derived type.
+    property list<Item> features
 
     readonly property string domain: root.entity_id.split(".")[0]
     readonly property var attributes: root.entity_data?.attributes ?? ({})
