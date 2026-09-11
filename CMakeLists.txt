@@ -101,6 +101,21 @@ target_include_directories(qthomeassistant PRIVATE src
 target_compile_definitions(qthomeassistant
                            PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}")
 
+# Android doesn't expose OpenSSL to NDK apps, so QtWebSockets has no TLS backend
+# for wss:// unless we bundle it ourselves. Prebuilt from
+# https://github.com/KDAB/android_openssl (Apache-2.0), commit b71f1470, the
+# "no-asm" build it recommends for Debug. Only arm64-v8a is vendored, matching
+# the only Android ABI kit this project builds against so far; a Release
+# Android build or another ABI needs its own lib pair added under
+# android/openssl/<abi>.
+if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+  set_target_properties(
+    qthomeassistant PROPERTIES
+    QT_ANDROID_EXTRA_LIBS
+    "${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/arm64-v8a/libcrypto_3.so;${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/arm64-v8a/libssl_3.so"
+  )
+endif()
+
 install(
   TARGETS qthomeassistant
   BUNDLE DESTINATION .

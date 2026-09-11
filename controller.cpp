@@ -3,7 +3,9 @@
 #include <QtCore/QDateTime>
 #include <QtCore/QDir>
 #include <QtCore/QEvent>
+#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QStandardPaths>
 #include <QtCore/QtDebug>
 
 #include <QtCore/qloggingcategory.h>
@@ -19,7 +21,14 @@ const std::vector<std::filesystem::path> kPossibleConfigPaths{
     std::filesystem::path{std::filesystem::current_path() /
                           std::filesystem::path{"config"}},
     std::filesystem::path{SOURCE_DIRECTORY / std::filesystem::path{"config"}},
-    std::filesystem::path{"/sdcard/Download/qt-hass/config"}};
+    // Scoped storage means an Android app can't open arbitrary /sdcard paths
+    // (e.g. /sdcard/qt-hass/config) without the user granting "All files
+    // access" in Settings, so this uses the app-specific external directory
+    // instead, which needs no permission at all.
+    std::filesystem::path{
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            .toStdString()} /
+        "qt-hass" / "config"};
 
 } // namespace
 
@@ -40,6 +49,17 @@ Controler::Controler(QObject *parent)
 
   is_idle_timer_.start();
   is_idle_timer_.setSingleShot(true);
+
+  // exists() alone isn't a reliable filter: on Android, cwd is "/" and
+  // "/config" is the (permission-denied) configfs mount, which exists but
+  // can never be opened -- so try each candidate in turn instead of trusting
+  // the first one that merely exists().
+  const auto config_it = std::ranges::find_if(
+      kPossibleConfigPaths,
+      [this](const std::filesystem::path &path) { return loadConfig(path); });
+  if (config_it != std::end(kPossibleConfigPaths))
+    configuration_file_watcher_.addPath(
+        QString::fromStdString(config_it->string()));
 }
 
 bool Controler::eventFilter(QObject *obj, QEvent *event) {
@@ -56,7 +76,34 @@ bool Controler::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
-void Controler::loadConfig(const std::filesystem::path &path) {}
+bool Controler::loadConfig(const std::filesystem::path &path) {
+  QFile file(QString::fromStdString(path.string()));
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    qCWarning(controller) << "Could not open config file" << file.fileName();
+    return false;
+  }
+
+  while (!file.atEnd()) {
+    const QByteArray line = file.readLine().trimmed();
+    if (line.isEmpty() || line.startsWith('#'))
+      continue;
+
+    const auto separator = line.indexOf('=');
+    if (separator < 0)
+      continue;
+
+    const QByteArray key = line.first(separator).trimmed();
+    const QByteArray value = line.sliced(separator + 1).trimmed();
+    if (key == "HASS_URL")
+      hass_url_ = QString::fromUtf8(value);
+    else if (key == "HASS_TOKEN")
+      hass_token_ = QString::fromUtf8(value);
+  }
+
+  configuration_path_ = QString::fromStdString(path.string());
+  Q_EMIT configurationPathChanged();
+  return true;
+}
 
 QUrl Controler::pathFor(const QString &config_path) {
   const std::vector<std::filesystem::path> possibleRootPaths{

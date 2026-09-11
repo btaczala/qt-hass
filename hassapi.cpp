@@ -1,4 +1,5 @@
 #include "hassapi.h"
+#include "controller.h"
 #include <QLoggingCategory>
 #include <QSslError>
 #include <QWebSocket>
@@ -13,8 +14,21 @@ Q_DECLARE_LOGGING_CATEGORY(hassAPI)
 Q_LOGGING_CATEGORY(hassAPI, "qthass.api")
 
 namespace {
-QUrl defaultUrl() { return QUrl{qEnvironmentVariable("HASS_URL")}; }
-QString defaultAccessToken() { return qEnvironmentVariable("HASS_TOKEN"); }
+// qEnvironmentVariable() finds nothing on Android, which has no process
+// environment to inherit HASS_URL/HASS_TOKEN from -- Controler::loadConfig()
+// covers that case from a config file instead.
+QUrl defaultUrl() {
+  QString url = qEnvironmentVariable("HASS_URL");
+  if (url.isEmpty())
+    url = Controler::create(nullptr, nullptr)->hassUrl();
+  return QUrl{url};
+}
+QString defaultAccessToken() {
+  QString token = qEnvironmentVariable("HASS_TOKEN");
+  if (token.isEmpty())
+    token = Controler::create(nullptr, nullptr)->hassToken();
+  return token;
+}
 } // namespace
 
 HassAPI::HassAPI(QObject *parent)
