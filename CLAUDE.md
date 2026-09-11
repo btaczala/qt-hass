@@ -16,7 +16,7 @@ cmake --build --preset desktop
 cmake --build --preset desktop --target all_qmllint   # qmllint over the QML module
 ```
 
-`CMakePresets.json` (committed) only defines hidden base presets (generator, `build/${presetName}` layout, common cache variables) -- it has no Qt paths, since those are machine-specific. `CMakeUserPresets.json` (gitignored) supplies the three concrete, buildable presets: `desktop`, `qt67`, and `qt6.10` (`cmake --list-presets` to see them; see Android below for the latter two). `desktop` overrides its `binaryDir` to `build/debug` specifically, since that's what `compile_commands.json` symlinks to. If `CMakeUserPresets.json` is ever missing, recreate `desktop` with `CMAKE_PREFIX_PATH` pointed at a Qt ≥ 6.7 macOS kit (`$HOME/Qt/6.10.1/macos` on this machine); if the Qt version matters, check `Qt6_DIR` in `CMakeCache.txt`.
+`CMakePresets.json` (committed) only defines hidden base presets (generator, `build/${presetName}` layout, common cache variables) -- it has no Qt paths, since those are machine-specific. `CMakeUserPresets.json` (gitignored) supplies the three concrete, buildable presets: `desktop`, `qt67`, and `qt610` (`cmake --list-presets` to see them; see Android below for the latter two). `desktop` overrides its `binaryDir` to `build/debug` specifically, since that's what `compile_commands.json` symlinks to. If `CMakeUserPresets.json` is ever missing, recreate `desktop` with `CMAKE_PREFIX_PATH` pointed at a Qt ≥ 6.7 macOS kit (`$HOME/Qt/6.10.1/macos` on this machine); if the Qt version matters, check `Qt6_DIR` in `CMakeCache.txt`.
 
 Run (macOS bundle). The app reads `HASS_URL` (e.g. `wss://host/api/websocket`; `ws://` for plain HTTP) and `HASS_TOKEN` (long-lived access token) from the environment. They live in `.envrc`, which contains the real token and is only kept out of git by a global ignore (the repo has no `.gitignore`). A non-interactive shell won't load it, so use:
 
@@ -45,7 +45,7 @@ ln -sfn /opt/homebrew/share/android-commandlinetools/ndk/26.1.10909125 "$ISO/ndk
 ln -sfn /opt/homebrew/share/android-commandlinetools/platforms/android-34 "$ISO/platforms/android-34"
 ```
 
-Build with the `qt67` preset (`qt6.10` for the API 28+ kit -- same commands, just swap the preset name; it doesn't need the isolated SDK root, so it points `ANDROID_SDK_ROOT` straight at `/opt/homebrew/share/android-commandlinetools`):
+Build with the `qt67` preset (`qt610` for the API 28+ kit -- same commands, just swap the preset name; it doesn't need the isolated SDK root, so it points `ANDROID_SDK_ROOT` straight at `/opt/homebrew/share/android-commandlinetools`):
 
 ```sh
 cmake --preset qt67
@@ -53,11 +53,11 @@ cmake --build --preset qt67 --target apk
 cmake --build --preset qt67 --target run   # install + launch on whatever device adb targets
 ```
 
-The `qt67`/`qt6.10` presets in `CMakeUserPresets.json` set `toolchainFile`, `QT_HOST_PATH`, `CMAKE_PREFIX_PATH`, `ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT` (as both `environment` and `cacheVariables`, since `CMakeLists.txt`'s `run` target reads it from the environment while CMake's own Android tooling reads the cache variable) and `JAVA_HOME` (environment only) for their respective kit; `binaryDir` is pinned to `build/android-arm64-qt67` / `build/android-arm64` rather than the presets' default `build/${presetName}`, to match the paths used below and elsewhere in this doc.
+The `qt67`/`qt610` presets in `CMakeUserPresets.json` set `toolchainFile`, `QT_HOST_PATH`, `CMAKE_PREFIX_PATH`, `ANDROID_SDK_ROOT`, `ANDROID_NDK_ROOT` (as both `environment` and `cacheVariables`, since `CMakeLists.txt`'s `run` target reads it from the environment while CMake's own Android tooling reads the cache variable) and `JAVA_HOME` (environment only) for their respective kit; `binaryDir` is pinned to `build/android-arm64-qt67` / `build/android-arm64` rather than the presets' default `build/${presetName}`, to match the paths used below and elsewhere in this doc.
 
-`run` (added to `CMakeLists.txt`, `ANDROID`-only) depends on `qthomeassistant_make_apk`, so it builds first if needed; it shells out to `adb`, located via `ANDROID_SDK_ROOT/platform-tools` or `PATH`. The APK it installs is the stable `android-build/qthomeassistant.apk` androiddeployqt copies its final output to (`${apk_final_dir}/${target}.apk`, not the deeper `android-build/build/outputs/apk/debug/android-build-debug.apk` gradle path, which is more of an implementation detail). It hardcodes the package name (`org.qtproject.example.qthomeassistant`, androiddeployqt's default since nothing sets `QT_ANDROID_PACKAGE_NAME`) — update it there if that's ever set explicitly.
+`run` (added to `CMakeLists.txt`, `ANDROID`-only) depends on `qthomeassistant_make_apk`, so it builds first if needed; it shells out to `adb`, located via `ANDROID_SDK_ROOT/platform-tools` or `PATH`. The APK it installs is the stable `android-build/qthomeassistant.apk` androiddeployqt copies its final output to (`${apk_final_dir}/${target}.apk`, not the deeper `android-build/build/outputs/apk/debug/android-build-debug.apk` gradle path, which is more of an implementation detail). After installing, it runs `tools/push_android_config.py` (needs the app already installed, since it goes through `run-as`) to regenerate `<binaryDir>/config` from `.envrc`'s `HASS_URL`/`HASS_TOKEN` and push it to the device before launching -- a dev convenience so the device always gets the same target `.envrc` already points the desktop build at, with nothing to keep in sync by hand. It hardcodes the package name once, in the `ANDROID_PACKAGE_NAME` CMake variable (`org.qtproject.example.qthomeassistant`, androiddeployqt's default since nothing sets `QT_ANDROID_PACKAGE_NAME`) — update it there if that's ever set explicitly.
 
-The AVD (`qthass`, Pixel 6 profile, `system-images;android-34;google_apis;arm64-v8a`) was created with `avdmanager create avd`; `avdmanager list avd`'s `devices.xml` lookup errors on this SDK layout but the AVD still gets created fine. Launch with `emulator -avd qthass`, then `cmake --build --preset qt67 --target run` (it's API 34, so `qt6.10` works too), or by hand:
+The AVD (`qthass`, Pixel 6 profile, `system-images;android-34;google_apis;arm64-v8a`) was created with `avdmanager create avd`; `avdmanager list avd`'s `devices.xml` lookup errors on this SDK layout but the AVD still gets created fine. Launch with `emulator -avd qthass`, then `cmake --build --preset qt67 --target run` (it's API 34, so `qt610` works too), or by hand:
 
 ```sh
 adb install -r build/android-arm64-qt67/android-build/qthomeassistant.apk
@@ -65,13 +65,14 @@ adb shell am start -n org.qtproject.example.qthomeassistant/org.qtproject.qt.and
 adb logcat -s libqthomeassistant_arm64-v8a.so qthass.api:D qthass.controller:D
 ```
 
-There's no `.envrc` equivalent on Android, so before starting the activity, push a `HASS_URL=...`/`HASS_TOKEN=...` file into the app's private storage (`adb push` can't reach it directly since that uid isn't `shell`):
+There's no `.envrc` equivalent on Android, so before starting the activity, push a `HASS_URL=...`/`HASS_TOKEN=...` file into the app's private storage (`adb push` can't reach it directly since that uid isn't `shell`). `cmake --build --preset qt67|qt610 --target run` now does this automatically (see below) via `tools/push_android_config.py`, which re-derives the config from `.envrc` on every run; by hand:
 
 ```sh
 adb push config /data/local/tmp/config
-adb shell run-as org.qtproject.example.qthomeassistant sh -c \
-  'mkdir -p files/qt-hass && cp /data/local/tmp/config files/qt-hass/config'
+adb shell "run-as org.qtproject.example.qthomeassistant sh -c 'mkdir -p files/qt-hass && cp /data/local/tmp/config files/qt-hass/config'"
 ```
+
+That has to be one quoted string, not `sh -c` and its argument as separate words: `adb shell` joins everything after `shell` with spaces before it reaches the device, so passing them separately loses the quoting that ties the command to `-c` -- the device's shell re-splits it, and `run-as`'s `sh -c` only ever sees the bare word `mkdir` (`mkdir: Needs 1 argument`), with the `cp` running outside `run-as` entirely.
 
 See `Controler` below for why `/data/user/0/.../files` and not `/sdcard`.
 

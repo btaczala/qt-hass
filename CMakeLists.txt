@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.10)
 
 project(
   QtHomeAssistant
@@ -16,6 +16,9 @@ find_package(
 
 if(QT_KNOWN_POLICY_QTP0002)
   qt_policy(SET QTP0002 NEW)
+endif()
+if(QT_KNOWN_POLICY_QTP0004)
+  qt_policy(SET QTP0004 NEW)
 endif()
 
 # The MDI name -> codepoint table is generated at configure time from the font and
@@ -74,7 +77,6 @@ qt_add_qml_module(
   qml/TileFeature.qml
   qml/MdiIcon.qml
   qml/IconImage.qml
-  qml/Icon.js
   qml/Cards/Weather.qml
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
@@ -137,11 +139,14 @@ endif()
 
 if(ANDROID)
   # `cmake --build <dir> --target run`: install the just-built APK on
-  # whatever device `adb` currently targets and launch it. The package name
-  # is the org.qtproject.example.<target> androiddeployqt falls back to
-  # since nothing here sets QT_ANDROID_PACKAGE_NAME -- update this if that
-  # ever changes. QtActivity itself is Qt's own fixed Android bindings
-  # class, not project-specific.
+  # whatever device `adb` currently targets, push a device-local config
+  # derived from .envrc, and launch it. The package name is the
+  # org.qtproject.example.<target> androiddeployqt falls back to since
+  # nothing here sets QT_ANDROID_PACKAGE_NAME -- update it here if that ever
+  # changes. QtActivity itself is Qt's own fixed Android bindings class, not
+  # project-specific.
+  set(ANDROID_PACKAGE_NAME "org.qtproject.example.qthomeassistant")
+
   find_program(
     ADB_EXECUTABLE adb
     HINTS "${ANDROID_SDK_ROOT}/platform-tools" "$ENV{ANDROID_SDK_ROOT}/platform-tools"
@@ -151,11 +156,20 @@ if(ANDROID)
       run
       COMMAND ${ADB_EXECUTABLE} install -r
               "${CMAKE_CURRENT_BINARY_DIR}/android-build/qthomeassistant.apk"
+      # `run-as` needs the app already installed (its data dir must exist),
+      # so this has to come after install and before the app starts. Dev
+      # convenience only -- re-derives HASS_URL/HASS_TOKEN from .envrc every
+      # time rather than provisioning the device once, see the script.
+      COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/push_android_config.py"
+              --envrc "${CMAKE_CURRENT_SOURCE_DIR}/.envrc"
+              --package ${ANDROID_PACKAGE_NAME}
+              --out "${CMAKE_CURRENT_BINARY_DIR}/config"
+              --adb ${ADB_EXECUTABLE}
       COMMAND ${ADB_EXECUTABLE} shell am start -n
-              org.qtproject.example.qthomeassistant/org.qtproject.qt.android.bindings.QtActivity
+              ${ANDROID_PACKAGE_NAME}/org.qtproject.qt.android.bindings.QtActivity
       DEPENDS qthomeassistant_make_apk
       USES_TERMINAL
-      COMMENT "Installing and launching qthomeassistant on the connected Android device")
+      COMMENT "Installing qthomeassistant, pushing its config, and launching it on the connected Android device")
   else()
     message(
       WARNING
