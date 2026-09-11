@@ -11,7 +11,7 @@ EntityBase {
         var j = JSON.parse(response);
 
         if (j['type'] === 'event') {
-            root.on = j['event']['data']['new_state']['state'] === 'on'
+            root.on = j['event']['data']['new_state']['state'] === 'on';
         } else {
             root.entity_data = j;
             friendlyNameText.text = j['attributes'].friendly_name;
@@ -19,20 +19,10 @@ EntityBase {
 
             var color = j["attributes"].rgb_color;
             if (color) {
-                console.log('color', color)
+                console.log('color', color);
                 lightIcon.color = Qt.rgba(color[0] / 255, color[1] / 255, color[2] / 255, 1);
             }
 
-            // Brightness UI: `dial` is not declared anywhere in this file,
-            // so this threw ReferenceError and aborted the rest of update().
-            // Disabled until an actual Dial is added.
-            // dial.visible = j["attributes"].supported_color_modes[0] !== "onoff";
-            // if (j["attributes"].brightness) {
-            //     dial.visible = root.on;
-            //     if (!dial.pressed) {
-            //         dial.value = j["attributes"].brightness;
-            //     }
-            // }
             if (root.on) {} else {
                 lightIcon.color = Material.foreground;
             }
