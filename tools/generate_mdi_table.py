@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+"""Generate the Material Design Icons name -> codepoint table.
+
+Run by CMake at configure time against the vendored assets, so the default path
+touches the network not at all:
+
+    python3 tools/generate_mdi_table.py --font fonts/materialdesignicons-webfont.ttf \
+                                        --meta fonts/materialdesignicons-meta.json \
+                                        --output <build>/generated/mdi_icons_data.h
+
+To move to a newer MDI release, refresh the vendored font and metadata first --
+this is the only mode that needs the network, and it is never run by the build:
+
+    python3 tools/generate_mdi_table.py --fetch 7.4.47
+"""
+
+import argparse
+import io
+import json
+import struct
+import sys
+import tarfile
+import urllib.request
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_FONT = ROOT / "fonts" / "materialdesignicons-webfont.ttf"
+DEFAULT_META = ROOT / "fonts" / "materialdesignicons-meta.json"
+
+# Rendered when a lookup misses -- Home Assistant will eventually send icons that
+# are newer than the vendored MDI release, and a visible glyph beats a blank box.
+FALLBACK_NAME = "help-circle-outline"
+
+
+def fetch_member(url, member):
+    print(f"fetching {url}")
+    with urllib.request.urlopen(url) as response:
+        blob = response.read()
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tar:
+        extracted = tar.extractfile(member)
+        if extracted is None:
+            raise SystemExit(f"{member} not found in {url}")
+        return extracted.read()
+
+
+def fetch_assets(version, font_path, meta_path):
+    """Refresh the vendored font and metadata. @mdi/font and @mdi/svg ship in lockstep."""
+    font = fetch_member(f"https://registry.npmjs.org/@mdi/font/-/font-{version}.tgz",
+                        "package/fonts/materialdesignicons-webfont.ttf")
+    meta = fetch_member(f"https://registry.npmjs.org/@mdi/svg/-/svg-{version}.tgz",
+                        "package/meta.json")
+
+    font_path.parent.mkdir(parents=True, exist_ok=True)
+    font_path.write_bytes(font)
+    meta_path.write_bytes(meta)
+    print(f"wrote {font_path.relative_to(ROOT)} ({len(font)} bytes)")
+    print(f"wrote {meta_path.relative_to(ROOT)} ({len(meta)} bytes)")
+
+
+def font_codepoints(ttf):
+    """Every codepoint the font's cmap maps, so the table can be cross-checked.
+
+    MDI lives entirely in Supplementary Private Use Area-A (plane 15), which only
+    a format 12 subtable can express -- format 4 is capped at U+FFFF.
+    """
+    num_tables = struct.unpack(">H", ttf[4:6])[0]
+    tables = {}
+    for i in range(num_tables):
+        entry = 12 + 16 * i
+        tag = ttf[entry:entry + 4].decode("latin1")
+        offset, length = struct.unpack(">II", ttf[entry + 8:entry + 16])
+        tables[tag] = (offset, length)
+
+    if "cmap" not in tables:
+        raise SystemExit("font has no cmap table")
+
+    cmap_offset = tables["cmap"][0]
+    covered = set()
+    num_subtables = struct.unpack(">H", ttf[cmap_offset + 2:cmap_offset + 4])[0]
+    for i in range(num_subtables):
+        record = cmap_offset + 4 + 8 * i
+        subtable = cmap_offset + struct.unpack(">I", ttf[record + 4:record + 8])[0]
+        if struct.unpack(">H", ttf[subtable:subtable + 2])[0] != 12:
+            continue
+        num_groups = struct.unpack(">I", ttf[subtable + 12:subtable + 16])[0]
+        for g in range(num_groups):
+            group = subtable + 16 + 12 * g
+            start, end, _ = struct.unpack(">III", ttf[group:group + 12])
+            covered.update(range(start, end + 1))
+    if not covered:
+        raise SystemExit("no format 12 cmap subtable -- cannot verify the font")
+    return covered
+
+
+def build_entries(meta):
+    """One entry per canonical name plus one per alias, all sharing a codepoint.
+
+    Aliases matter: Home Assistant sends alias names, and they have no SVG file of
+    their own, so a lookup table is the only thing that resolves them.
+
+    Canonical names are claimed first, in a separate pass. Aliases overlap heavily
+    -- one icon's alias is frequently another icon's real name ('undo', 'redo',
+    'invite') -- and letting an alias shadow a canonical name would silently
+    resolve that name to the wrong glyph.
+    """
+    entries = {}
+    for icon in meta:
+        if icon["name"] in entries:
+            print(f"warning: duplicate icon name {icon['name']}", file=sys.stderr)
+            continue
+        entries[icon["name"]] = int(icon["codepoint"], 16)
+
+    for icon in meta:
+        codepoint = int(icon["codepoint"], 16)
+        for alias in icon.get("aliases", []):
+            entries.setdefault(alias, codepoint)
+
+    return sorted(entries.items())
+
+
+def render_header(entries, version, fallback):
+    width = max(len(name) for name, _ in entries) + 3
+    rows = "\n".join(
+        f'    {{{f'"{name}",':<{width}} 0x{cp:05X}}},' for name, cp in entries)
+
+    return f"""\
+// Generated by tools/generate_mdi_table.py -- do not edit, and do not commit.
+//
+// CMake regenerates this at configure time from the vendored font and metadata
+// under fonts/. Sorted by name so Mdi::glyph() can binary search it. Includes
+// aliases, which is why a table is needed at all: Home Assistant sends them.
+//
+// The generator verifies sortedness and cross-checks every codepoint against the
+// font's cmap. Neither check is a static_assert -- {len(entries)} constexpr
+// string_view comparisons blow past default constexpr step limits.
+
+#pragma once
+
+#include <array>
+#include <string_view>
+
+namespace mdi {{
+
+struct Entry {{
+  std::string_view name;
+  char32_t codepoint;
+}};
+
+inline constexpr std::string_view kVersion = "{version}";
+
+// "{FALLBACK_NAME}" -- rendered for names this MDI release does not know.
+inline constexpr char32_t kFallbackCodepoint = 0x{fallback:05X};
+
+inline constexpr std::array<Entry, {len(entries)}> kIcons{{{{
+{rows}
+}}}};
+
+}}  // namespace mdi
+"""
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--font", type=Path, default=DEFAULT_FONT,
+                        help="vendored webfont, cross-checked against the table")
+    parser.add_argument("--meta", type=Path, default=DEFAULT_META,
+                        help="vendored @mdi/svg meta.json")
+    parser.add_argument("--output", type=Path,
+                        help="header to write; omit to print to stdout")
+    parser.add_argument("--fetch", metavar="VERSION",
+                        help="refresh the vendored font and metadata from npm, "
+                             "then generate (the only mode that uses the network)")
+    args = parser.parse_args()
+
+    if args.fetch:
+        fetch_assets(args.fetch, args.font, args.meta)
+
+    for path in (args.font, args.meta):
+        if not path.is_file():
+            raise SystemExit(f"{path} is missing -- run with --fetch <version> to vendor it")
+
+    meta = json.loads(args.meta.read_text())
+    entries = build_entries(meta)
+    covered = font_codepoints(args.font.read_bytes())
+
+    missing = sorted({cp for _, cp in entries} - covered)
+    if missing:
+        raise SystemExit(
+            f"{len(missing)} codepoints are absent from the font's cmap "
+            f"(first: U+{missing[0]:05X}) -- {args.font.name} and {args.meta.name} "
+            f"are out of sync; re-run with --fetch <version>")
+
+    if any(a[0] >= b[0] for a, b in zip(entries, entries[1:])):
+        raise SystemExit("entries are not sorted -- binary search would be wrong")
+
+    fallback = dict(entries).get(FALLBACK_NAME)
+    if fallback is None:
+        raise SystemExit(f"fallback icon {FALLBACK_NAME!r} is not in this MDI release")
+
+    # meta.json carries no release number of its own; the highest icon "version"
+    # field is what the release actually shipped.
+    version = max((icon.get("version", "") for icon in meta), key=_version_key)
+
+    header = render_header(entries, version, fallback)
+    if args.output is None:
+        sys.stdout.write(header)
+        return
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    # Skip the write when nothing changed, so a configure run does not needlessly
+    # invalidate every object file that includes this header.
+    if args.output.is_file() and args.output.read_text() == header:
+        print(f"{args.output} is up to date ({len(entries)} entries)")
+        return
+    args.output.write_text(header)
+    print(f"wrote {args.output} ({len(entries)} entries, MDI {version})")
+
+
+def _version_key(v):
+    try:
+        return tuple(int(part) for part in v.split("."))
+    except (AttributeError, ValueError):
+        return (0,)
+
+
+if __name__ == "__main__":
+    main()

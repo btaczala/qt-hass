@@ -14,6 +14,36 @@ find_package(
   COMPONENTS Gui Quick Multimedia WebSockets QuickControls2
   REQUIRED)
 
+# The MDI name -> codepoint table is generated at configure time from the font and
+# metadata vendored under fonts/, rather than committed. Both are offline inputs;
+# refreshing them to a newer MDI release is a manual, explicitly networked step:
+#   python3 tools/generate_mdi_table.py --fetch <version>
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+set(MDI_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_mdi_table.py)
+set(MDI_FONT ${CMAKE_CURRENT_SOURCE_DIR}/fonts/materialdesignicons-webfont.ttf)
+set(MDI_META ${CMAKE_CURRENT_SOURCE_DIR}/fonts/materialdesignicons-meta.json)
+set(MDI_TABLE ${CMAKE_CURRENT_BINARY_DIR}/generated/mdi_icons_data.h)
+
+# Editing any input re-runs configure, which is what regenerates the table.
+set_property(
+  DIRECTORY
+  APPEND
+  PROPERTY CMAKE_CONFIGURE_DEPENDS ${MDI_GENERATOR} ${MDI_FONT} ${MDI_META})
+
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${MDI_GENERATOR} --font ${MDI_FONT} --meta
+          ${MDI_META} --output ${MDI_TABLE}
+  RESULT_VARIABLE MDI_RESULT
+  OUTPUT_VARIABLE MDI_OUTPUT
+  ERROR_VARIABLE MDI_ERROR)
+
+if(NOT MDI_RESULT EQUAL 0)
+  message(FATAL_ERROR "Generating ${MDI_TABLE} failed:\n${MDI_OUTPUT}${MDI_ERROR}")
+endif()
+
+message(STATUS "MDI icons: ${MDI_OUTPUT}")
+
 qt_add_executable(qthomeassistant src/main.cpp)
 
 qt_add_qml_module(
@@ -29,17 +59,26 @@ qt_add_qml_module(
   hassapi.cpp
   controller.h
   controller.cpp
+  src/mdi.h
+  src/mdi.cpp
   QML_FILES
-  qml/main.qml
+  qml/Main.qml
   qml/EntityBase.qml
   qml/Light.qml
+  qml/MdiIcon.qml
   qml/IconImage.qml
   qml/Icon.js
   qml/Cards/Weather.qml
   RESOURCES
-  qtquickcontrols2.conf
+  fonts/materialdesignicons-webfont.ttf
   images/lightbulb.svg
   images/lightbulb-off.svg)
+
+# Qt only looks for the Controls configuration at :/qtquickcontrols2.conf, and
+# qt_add_qml_module pins its RESOURCES under RESOURCE_PREFIX/URI -- so this file
+# has to be added separately or the Material style silently never activates.
+qt_add_resources(qthomeassistant "controls_conf" PREFIX "/" FILES
+                 qtquickcontrols2.conf)
 
 set_target_properties(
   qthomeassistant
@@ -55,6 +94,11 @@ add_subdirectory(3rdParty)
 target_link_libraries(
   qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
                           Qt6::QuickControls2)
+
+# qt_add_qml_module's generated type registration includes headers by basename,
+# so src/ has to be reachable the same way the root-level headers are.
+target_include_directories(qthomeassistant PRIVATE src
+                                                   ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 target_compile_definitions(qthomeassistant
                            PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}")

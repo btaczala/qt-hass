@@ -29,4 +29,6 @@ ApplicationWindow {
     Component.onCompleted: {
         HassAPI.connect();
     }
+
+    IconImage{}
 }

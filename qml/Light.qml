@@ -51,11 +51,10 @@ EntityBase {
                 Layout.fillHeight: true
                 radius: 5
 
-                Image {
-                    sourceSize.width: 48
-                    sourceSize.height: 48
+                MdiIcon {
                     anchors.centerIn: parent
-                    source: root.on ? "https://raw.githubusercontent.com/Templarian/MaterialDesign/refs/heads/master/svg/lightbulb-on.svg" : "https://raw.githubusercontent.com/Templarian/MaterialDesign/refs/heads/master/svg/lightbulb-off.svg"
+                    iconSize: 48
+                    icon: root.on ? "mdi:lightbulb-on" : "mdi:lightbulb-off"
                 }
             }
 

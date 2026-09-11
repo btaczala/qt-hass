@@ -16,10 +16,20 @@ EntityBase {
 
 
 
+    // Most Home Assistant weather states concatenate straight into an MDI name,
+    // but three do not -- and those silently rendered nothing before.
+    readonly property var iconOverrides: ({
+        "clear-night": "mdi:weather-night",
+        "partlycloudy": "mdi:weather-partly-cloudy",
+        "exceptional": "mdi:weather-cloudy-alert"
+    })
+
     RowLayout {
         anchors.fill: parent
-        Image {
-            source: `https://raw.githubusercontent.com/Templarian/MaterialDesign/refs/heads/master/svg/weather-${root.state}.svg` 
+        MdiIcon {
+            Layout.alignment: Qt.AlignCenter
+            iconSize: 64
+            icon: root.iconOverrides[root.state] ?? `mdi:weather-${root.state}`
         }
     }
 }
