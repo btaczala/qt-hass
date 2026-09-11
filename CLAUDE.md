@@ -8,7 +8,7 @@ Qt 6 / QML Home Assistant dashboard (`qthomeassistant`) that talks to HA over it
 
 ## Build, run, lint
 
-Requires Qt ≥ 6.10 (Gui, Quick, QuickControls2, Multimedia, WebSockets), Python 3 (used at configure time), CMake, Ninja.
+Requires Qt ≥ 6.7 (Gui, Quick, QuickControls2, Multimedia, WebSockets), Python 3 (used at configure time), CMake, Ninja. The floor is 6.7, not something newer, specifically so Android builds can target Qt 6.7.x — see Android below for why.
 
 ```sh
 cmake -S . -B build/debug -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=$HOME/Qt/6.10.1/macos
@@ -30,28 +30,44 @@ There are no tests.
 
 ### Android
 
-On this machine: Android Studio + `android-commandlinetools` (Homebrew casks) provide the SDK, rooted at `/opt/homebrew/share/android-commandlinetools`; NDK r27c (`ndk;27.3.13750724`) matches what the `~/Qt/6.10.1/android_arm64_v8a` kit was built against (check `qt.toolchain.cmake`'s `__qt_initially_configured_toolchain_file` if that ever changes); JDK 17 (`temurin@17`) is required for Gradle 8.14.3/AGP 8.10.1 — the system default JDK can stay newer, just override `JAVA_HOME` for the build.
+The build targets Qt **6.7.3**, not the newer 6.10.1 used for desktop: Qt 6.8+ raised Android's floor to API 28 and `libQt6Core` started calling `getentropy()` (added to Bionic libc only in API 28), so anything built with Qt ≥ 6.8 hard-crashes with `UnsatisfiedLinkError: dlopen failed: cannot locate symbol "getentropy"` on any API 27-or-older device — confirmed on a real device (Android 8.1 / API 27) in 2026-09. Qt 6.7.3's `libQt6Core` doesn't reference that symbol, and its default `qtMinSdkVersion` is 23 (Android 6.0), so the same source now installs and runs down to API 27+ without any minSdk override — lowering `QT_ANDROID_MIN_SDK_VERSION` on a Qt ≥ 6.8 build does *not* work (the manifest check passes but it still crashes at library load), it has to be a different Qt version. If a device this old ever stops mattering, upgrading back to 6.10.1 (already installed at `~/Qt/6.10.1`) is a drop-in swap of the paths below.
+
+On this machine: Android Studio + `android-commandlinetools` (Homebrew casks) provide the SDK, rooted at `/opt/homebrew/share/android-commandlinetools`; NDK r26b (`ndk;26.1.10909125`) matches what the `~/Qt/6.7.3/android_arm64_v8a` kit was built against (check `qt.toolchain.cmake`'s `__qt_initially_configured_toolchain_file` if that ever changes — the 6.10.1 kit instead wants NDK r27c, `ndk;27.3.13750724`); JDK 17 (`temurin@17`) is required for Gradle — the system default JDK can stay newer, just override `JAVA_HOME` for the build.
+
+Qt 6.7.3's Gradle templates pull AGP 7.4.1, whose bundled `aapt2` can't parse the `android-36` platform jar (androiddeployqt's default compileSdk is always "the highest installed platform," and this machine's SDK has `android-36` installed for the 6.10.1 kit) — it fails resource linking with `aapt2 E ... RES_TABLE_TYPE_TYPE entry offsets overlap actual entry data`. Qt 6.7.3 has no CMake-level `QT_ANDROID_COMPILE_SDK_VERSION` property to override this (that property only exists from Qt 6.8+), so the fix is a second, isolated `ANDROID_SDK_ROOT` at `~/Android/sdk-compat-api34` — symlinks to the real SDK's `platform-tools`, `cmdline-tools`, `licenses`, `emulator`, `build-tools/35.0.0`, and `ndk/26.1.10909125`, but only `platforms/android-34` (not `android-36`), so androiddeployqt's "highest installed" scan lands on 34, which AGP 7.4.1 can parse and which still covers Qt 6.7.3's `qtTargetSdkVersion` (also 34). `CMakeLists.txt` pins `QT_ANDROID_COMPILE_SDK_VERSION` to `android-34` whenever `Qt6_VERSION VERSION_LESS 6.8`, for the same reason. Recreate the symlink farm if `~/Android/sdk-compat-api34` is ever missing:
 
 ```sh
-export ANDROID_SDK_ROOT=/opt/homebrew/share/android-commandlinetools
-export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/27.3.13750724
-export JAVA_HOME=$(/usr/libexec/java_home -v 17)
-
-cmake -S . -B build/android-arm64 -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$HOME/Qt/6.10.1/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake" \
-  -DQT_HOST_PATH="$HOME/Qt/6.10.1/macos" \
-  -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
-  -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
-  -DCMAKE_PREFIX_PATH="$HOME/Qt/6.10.1/android_arm64_v8a" \
-  -DQT_ANDROID_ABIS=arm64-v8a \
-  -DCMAKE_BUILD_TYPE=Debug
-cmake --build build/android-arm64 --target apk
+ISO=$HOME/Android/sdk-compat-api34
+mkdir -p "$ISO/platforms" "$ISO/build-tools" "$ISO/ndk"
+ln -sfn /opt/homebrew/share/android-commandlinetools/{platform-tools,cmdline-tools,licenses,emulator} "$ISO/"
+ln -sfn /opt/homebrew/share/android-commandlinetools/build-tools/35.0.0 "$ISO/build-tools/35.0.0"
+ln -sfn /opt/homebrew/share/android-commandlinetools/ndk/26.1.10909125 "$ISO/ndk/26.1.10909125"
+ln -sfn /opt/homebrew/share/android-commandlinetools/platforms/android-34 "$ISO/platforms/android-34"
 ```
 
-The AVD (`qthass`, Pixel 6 profile, `system-images;android-34;google_apis;arm64-v8a`) was created with `avdmanager create avd`; `avdmanager list avd`'s `devices.xml` lookup errors on this SDK layout but the AVD still gets created fine. Launch with `emulator -avd qthass`, then:
+```sh
+export ANDROID_SDK_ROOT=$HOME/Android/sdk-compat-api34
+export ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)
+
+cmake -S . -B build/android-arm64-qt67 -G Ninja \
+  -DCMAKE_TOOLCHAIN_FILE="$HOME/Qt/6.7.3/android_arm64_v8a/lib/cmake/Qt6/qt.toolchain.cmake" \
+  -DQT_HOST_PATH="$HOME/Qt/6.7.3/macos" \
+  -DANDROID_SDK_ROOT="$ANDROID_SDK_ROOT" \
+  -DANDROID_NDK_ROOT="$ANDROID_NDK_ROOT" \
+  -DCMAKE_PREFIX_PATH="$HOME/Qt/6.7.3/android_arm64_v8a" \
+  -DQT_ANDROID_ABIS=arm64-v8a \
+  -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/android-arm64-qt67 --target apk
+cmake --build build/android-arm64-qt67 --target run   # install + launch on whatever device adb targets
+```
+
+`run` (added to `CMakeLists.txt`, `ANDROID`-only) depends on `qthomeassistant_make_apk`, so it builds first if needed; it shells out to `adb`, located via `ANDROID_SDK_ROOT/platform-tools` or `PATH`. The APK it installs is the stable `android-build/qthomeassistant.apk` androiddeployqt copies its final output to (`${apk_final_dir}/${target}.apk`, not the deeper `android-build/build/outputs/apk/debug/android-build-debug.apk` gradle path, which is more of an implementation detail). It hardcodes the package name (`org.qtproject.example.qthomeassistant`, androiddeployqt's default since nothing sets `QT_ANDROID_PACKAGE_NAME`) — update it there if that's ever set explicitly.
+
+The AVD (`qthass`, Pixel 6 profile, `system-images;android-34;google_apis;arm64-v8a`) was created with `avdmanager create avd`; `avdmanager list avd`'s `devices.xml` lookup errors on this SDK layout but the AVD still gets created fine. Launch with `emulator -avd qthass`, then `cmake --build build/android-arm64-qt67 --target run`, or by hand:
 
 ```sh
-adb install -r build/android-arm64/android-build/build/outputs/apk/debug/android-build-debug.apk
+adb install -r build/android-arm64-qt67/android-build/qthomeassistant.apk
 adb shell am start -n org.qtproject.example.qthomeassistant/org.qtproject.qt.android.bindings.QtActivity
 adb logcat -s libqthomeassistant_arm64-v8a.so qthass.api:D qthass.controller:D
 ```

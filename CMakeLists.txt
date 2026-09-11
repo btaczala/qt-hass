@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 23)
 
 find_package(
-  Qt6 6.10
+  Qt6 6.7
   COMPONENTS Gui Quick Multimedia WebSockets QuickControls2
   REQUIRED)
 
@@ -119,6 +119,45 @@ if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
     QT_ANDROID_EXTRA_LIBS
     "${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/arm64-v8a/libcrypto_3.so;${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/arm64-v8a/libssl_3.so"
   )
+endif()
+
+if(ANDROID AND Qt6_VERSION VERSION_LESS 6.8)
+  # Qt < 6.8's Gradle templates pull AGP 7.4.1, whose bundled aapt2 can't
+  # parse the android-36 platform jar (androiddeployqt's default compileSdk,
+  # a platform much newer than AGP 7.4.1 was built for) -- aapt2 fails with
+  # "RES_TABLE_TYPE_TYPE entry offsets overlap actual entry data". Pin
+  # compileSdk down to something that AGP actually understands; 34 still
+  # covers this Qt version's targetSdk (also 34).
+  set_target_properties(qthomeassistant PROPERTIES QT_ANDROID_COMPILE_SDK_VERSION "android-34")
+endif()
+
+if(ANDROID)
+  # `cmake --build <dir> --target run`: install the just-built APK on
+  # whatever device `adb` currently targets and launch it. The package name
+  # is the org.qtproject.example.<target> androiddeployqt falls back to
+  # since nothing here sets QT_ANDROID_PACKAGE_NAME -- update this if that
+  # ever changes. QtActivity itself is Qt's own fixed Android bindings
+  # class, not project-specific.
+  find_program(
+    ADB_EXECUTABLE adb
+    HINTS "${ANDROID_SDK_ROOT}/platform-tools" "$ENV{ANDROID_SDK_ROOT}/platform-tools"
+  )
+  if(ADB_EXECUTABLE)
+    add_custom_target(
+      run
+      COMMAND ${ADB_EXECUTABLE} install -r
+              "${CMAKE_CURRENT_BINARY_DIR}/android-build/qthomeassistant.apk"
+      COMMAND ${ADB_EXECUTABLE} shell am start -n
+              org.qtproject.example.qthomeassistant/org.qtproject.qt.android.bindings.QtActivity
+      DEPENDS qthomeassistant_make_apk
+      USES_TERMINAL
+      COMMENT "Installing and launching qthomeassistant on the connected Android device")
+  else()
+    message(
+      WARNING
+        "adb not found (checked ANDROID_SDK_ROOT/platform-tools and PATH) -- the 'run' target won't be available."
+    )
+  endif()
 endif()
 
 install(
