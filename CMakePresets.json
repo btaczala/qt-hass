@@ -24,7 +24,10 @@
       "cacheVariables": {
         "QT_ANDROID_ABIS": "arm64-v8a"
       },
-      "description": "Android arm64-v8a build. Needs toolchainFile, QT_HOST_PATH, CMAKE_PREFIX_PATH, ANDROID_SDK_ROOT and ANDROID_NDK_ROOT supplied by a preset that inherits this one -- see CMakeUserPresets.json / CLAUDE.md."
+      "warnings": {
+        "deprecated": false
+      },
+      "description": "Android arm64-v8a build. Needs toolchainFile, QT_HOST_PATH, CMAKE_PREFIX_PATH, ANDROID_SDK_ROOT and ANDROID_NDK_ROOT supplied by a preset that inherits this one -- see CMakeUserPresets.json / CLAUDE.md. deprecated warnings are off because both vendored NDK toolchain files (android.toolchain.cmake) call cmake_minimum_required(VERSION 3.6), which is otherwise a deprecation warning on every configure -- not something we can fix, it's Google's file."
     }
   ],
   "buildPresets": [
