@@ -14,6 +14,10 @@ find_package(
   COMPONENTS Gui Quick Multimedia WebSockets QuickControls2
   REQUIRED)
 
+if(QT_KNOWN_POLICY_QTP0002)
+  qt_policy(SET QTP0002 NEW)
+endif()
+
 # The MDI name -> codepoint table is generated at configure time from the font and
 # metadata vendored under fonts/, rather than committed. Both are offline inputs;
 # refreshing them to a newer MDI release is a manual, explicitly networked step:
