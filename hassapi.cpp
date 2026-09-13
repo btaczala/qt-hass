@@ -14,20 +14,9 @@ Q_DECLARE_LOGGING_CATEGORY(hassAPI)
 Q_LOGGING_CATEGORY(hassAPI, "qthass.api")
 
 namespace {
-// qEnvironmentVariable() finds nothing on Android, which has no process
-// environment to inherit HASS_URL/HASS_TOKEN from -- Controler::loadConfig()
-// covers that case from a config file instead.
-QUrl defaultUrl() {
-  QString url = qEnvironmentVariable("HASS_URL");
-  if (url.isEmpty())
-    url = Controler::create(nullptr, nullptr)->hassUrl();
-  return QUrl{url};
-}
+QUrl defaultUrl() { return QUrl{Controler::create(nullptr, nullptr)->hassUrl()}; }
 QString defaultAccessToken() {
-  QString token = qEnvironmentVariable("HASS_TOKEN");
-  if (token.isEmpty())
-    token = Controler::create(nullptr, nullptr)->hassToken();
-  return token;
+  return Controler::create(nullptr, nullptr)->hassToken();
 }
 } // namespace
 
@@ -129,6 +118,20 @@ HassAPI::HassAPI(QObject *parent)
 void HassAPI::connect() {
   qCDebug(hassAPI) << "Connecting to " << url_;
   socket_->open(url_);
+}
+
+void HassAPI::reconnect() {
+  socket_->abort();
+  // abort() only emits disconnected() for a socket that had actually
+  // connected, so don't rely on that handler to reset the session state.
+  if (connected_) {
+    connected_ = false;
+    subscribed_entities_.clear();
+    entity_states_.clear();
+    emit connectedChanged();
+  }
+  url_ = defaultUrl();
+  connect();
 }
 
 void HassAPI::registerStateChanges(QString entity_id, QJSValue fn) {

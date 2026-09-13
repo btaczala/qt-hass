@@ -4,8 +4,6 @@ import QtQuick.Layouts
 import QtQuick.Controls.Material
 
 import QtHomeAssistant
-import 'qrc:/res/QtHomeAssistant/qml/Cards'
-import 'qrc:/res/QtHomeAssistant/qml/Features'
 
 Item {
     RowLayout {

@@ -51,6 +51,37 @@ endif()
 
 message(STATUS "MDI icons: ${MDI_OUTPUT}")
 
+# HASS_URL/HASS_TOKEN are bundled into the binary as :/qt-hass/config, generated
+# from .envrc at configure time (edit .envrc, rebuild). Deliberately simple until
+# there's a real story for how others customize a build; it lands in the build
+# directory only, since it holds the real token.
+set(CONFIG_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_config.py)
+set(ENVRC ${CMAKE_CURRENT_SOURCE_DIR}/.envrc)
+set(HASS_CONFIG ${CMAKE_CURRENT_BINARY_DIR}/generated/config)
+
+set_property(
+  DIRECTORY
+  APPEND
+  PROPERTY CMAKE_CONFIGURE_DEPENDS ${CONFIG_GENERATOR})
+if(EXISTS ${ENVRC})
+  set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY CMAKE_CONFIGURE_DEPENDS ${ENVRC})
+endif()
+
+execute_process(
+  COMMAND ${Python3_EXECUTABLE} ${CONFIG_GENERATOR} --envrc ${ENVRC} --out
+          ${HASS_CONFIG}
+  RESULT_VARIABLE CONFIG_RESULT
+  ERROR_VARIABLE CONFIG_ERROR)
+
+if(NOT CONFIG_RESULT EQUAL 0)
+  message(FATAL_ERROR "Generating ${HASS_CONFIG} failed:\n${CONFIG_ERROR}")
+elseif(CONFIG_ERROR)
+  message(WARNING "${CONFIG_ERROR}")
+endif()
+
 qt_add_executable(qthomeassistant src/main.cpp)
 
 qt_add_qml_module(
@@ -80,6 +111,15 @@ qt_add_qml_module(
   qml/Cards/Weather.qml
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
+  qml/Dashboard/Dashboard.qml
+  qml/Dashboard/PageOverview.qml
+  qml/Dashboard/PageEnergy.qml
+  qml/Energy/EnergyFlowCard.qml
+  qml/Energy/EnergyFlowLine.qml
+  qml/Energy/EnergyNode.qml
+  qml/Energy/FakeEnergySource.qml
+  qml/Settings/SettingsPage.qml
+  qml/Settings/UiSettings.qml
   RESOURCES
   fonts/materialdesignicons-webfont.ttf
   images/lightbulb.svg
@@ -90,6 +130,9 @@ qt_add_qml_module(
 # has to be added separately or the Material style silently never activates.
 qt_add_resources(qthomeassistant "controls_conf" PREFIX "/" FILES
                  qtquickcontrols2.conf)
+
+qt_add_resources(qthomeassistant "hass_config" PREFIX "/qt-hass" BASE
+                 ${CMAKE_CURRENT_BINARY_DIR}/generated FILES ${HASS_CONFIG})
 
 set_target_properties(
   qthomeassistant
@@ -108,9 +151,6 @@ target_link_libraries(
 # so src/ has to be reachable the same way the root-level headers are.
 target_include_directories(qthomeassistant PRIVATE src
                                                    ${CMAKE_CURRENT_BINARY_DIR}/generated)
-
-target_compile_definitions(qthomeassistant
-                           PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}")
 
 # Android doesn't expose OpenSSL to NDK apps, so QtWebSockets has no TLS backend
 # for wss:// unless we bundle it ourselves. Prebuilt from
@@ -139,9 +179,8 @@ endif()
 
 if(ANDROID)
   # `cmake --build <dir> --target run`: install the just-built APK on
-  # whatever device `adb` currently targets, push a device-local config
-  # derived from .envrc, and launch it. The package name is the
-  # org.qtproject.example.<target> androiddeployqt falls back to since
+  # whatever device `adb` currently targets and launch it. The package name is
+  # the org.qtproject.example.<target> androiddeployqt falls back to since
   # nothing here sets QT_ANDROID_PACKAGE_NAME -- update it here if that ever
   # changes. QtActivity itself is Qt's own fixed Android bindings class, not
   # project-specific.
@@ -156,29 +195,11 @@ if(ANDROID)
       run
       COMMAND ${ADB_EXECUTABLE} install -r
               "${CMAKE_CURRENT_BINARY_DIR}/android-build/qthomeassistant.apk"
-      # `run-as` needs the app already installed (its data dir must exist),
-      # so this has to come after install and before the app starts. Dev
-      # convenience only -- re-derives HASS_URL/HASS_TOKEN from .envrc every
-      # time rather than provisioning the device once, see the script.
-      COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/push_android_config.py"
-              --envrc "${CMAKE_CURRENT_SOURCE_DIR}/.envrc"
-              --package ${ANDROID_PACKAGE_NAME}
-              --out "${CMAKE_CURRENT_BINARY_DIR}/config"
-              --adb ${ADB_EXECUTABLE}
-      # Controler::pathFor()'s /sdcard/qt-hass fallback (see qml/Main.qml) is
-      # the only one of its three search paths that exists on-device --
-      # SOURCE_DIRECTORY is baked in at compile time as this machine's path,
-      # and /usr/share/qt-hass is a desktop-only convention. Unlike the config
-      # above, /sdcard is plain external storage: no run-as needed, and it
-      # doesn't require the app to already be installed.
-      COMMAND ${ADB_EXECUTABLE} shell mkdir -p /sdcard/qt-hass
-      COMMAND ${ADB_EXECUTABLE} push "${CMAKE_CURRENT_SOURCE_DIR}/default_dashboard"
-              /sdcard/qt-hass/
       COMMAND ${ADB_EXECUTABLE} shell am start -n
               ${ANDROID_PACKAGE_NAME}/org.qtproject.qt.android.bindings.QtActivity
       DEPENDS qthomeassistant_make_apk
       USES_TERMINAL
-      COMMENT "Installing qthomeassistant, pushing its config and dashboard, and launching it on the connected Android device")
+      COMMENT "Installing and launching qthomeassistant on the connected Android device")
   else()
     message(
       WARNING

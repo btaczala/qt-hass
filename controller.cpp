@@ -1,65 +1,108 @@
 #include "controller.h"
 
-#include <QtCore/QDateTime>
-#include <QtCore/QDir>
 #include <QtCore/QEvent>
 #include <QtCore/QFile>
-#include <QtCore/QFileInfo>
-#include <QtCore/QStandardPaths>
+#include <QtCore/QSettings>
 #include <QtCore/QtDebug>
 
 #include <QtCore/qloggingcategory.h>
 #include <chrono>
-#include <filesystem>
 
 Q_LOGGING_CATEGORY(controller, "qthass.controller")
 
 Controler *Controler::s_instance = nullptr;
 namespace {
 const auto kDefaultIdleTimeout = std::chrono::seconds(60);
-const std::vector<std::filesystem::path> kPossibleConfigPaths{
-    std::filesystem::path{std::filesystem::current_path() /
-                          std::filesystem::path{"config"}},
-    std::filesystem::path{SOURCE_DIRECTORY / std::filesystem::path{"config"}},
-    // Scoped storage means an Android app can't open arbitrary /sdcard paths
-    // (e.g. /sdcard/qt-hass/config) without the user granting "All files
-    // access" in Settings, so this uses the app-specific external directory
-    // instead, which needs no permission at all.
-    std::filesystem::path{
-        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
-            .toStdString()} /
-        "qt-hass" / "config"};
+const auto kConfigPath = QStringLiteral(":/qt-hass/config");
 
+const auto kHassUrlKey = QStringLiteral("connection/url");
+const auto kHassTokenKey = QStringLiteral("connection/token");
+const auto kIdleTimeoutKey = QStringLiteral("idleTimeout");
 } // namespace
 
 Controler::Controler(QObject *parent)
     : QObject(parent), has_user_interaction_(false) {
 
+  const QSettings settings;
   is_idle_timer_.setInterval(
-      std::chrono::duration_cast<std::chrono::milliseconds>(kDefaultIdleTimeout)
-          .count());
+      std::chrono::seconds(settings
+                               .value(kIdleTimeoutKey,
+                                      qint64(kDefaultIdleTimeout.count()))
+                               .toInt()));
   connect(&is_idle_timer_, &QTimer::timeout, this, [this]() {
     qDebug() << "idle";
     Q_EMIT idle(true);
   });
 
-  connect(
-      &configuration_file_watcher_, &QFileSystemWatcher::fileChanged,
-      [this](const QString &filePath) { loadConfig(filePath.toStdString()); });
-
   is_idle_timer_.start();
   is_idle_timer_.setSingleShot(true);
 
-  // exists() alone isn't a reliable filter: on Android, cwd is "/" and
-  // "/config" is the (permission-denied) configfs mount, which exists but
-  // can never be opened -- so try each candidate in turn instead of trusting
-  // the first one that merely exists().
-  const auto config_it = std::ranges::find_if(
-      kPossibleConfigPaths,
-      [this](const std::filesystem::path &path) { return loadConfig(path); });
-  if (config_it != std::end(kPossibleConfigPaths))
-    configuration_file_watcher_.addPath(
-        QString::fromStdString(config_it->string()));
+  loadConnection();
+}
+
+void Controler::loadConnection() {
+  const QString old_url = hass_url_;
+  const QString old_token = hass_token_;
+  hass_url_.clear();
+  hass_token_.clear();
+
+  loadConfig();
+
+  // qEnvironmentVariable() finds nothing on Android, which has no process
+  // environment to inherit these from -- the bundled config covers that.
+  if (const QString url = qEnvironmentVariable("HASS_URL"); !url.isEmpty())
+    hass_url_ = url;
+  if (const QString token = qEnvironmentVariable("HASS_TOKEN");
+      !token.isEmpty())
+    hass_token_ = token;
+
+  const QSettings settings;
+  hass_url_ = settings.value(kHassUrlKey, hass_url_).toString();
+  hass_token_ = settings.value(kHassTokenKey, hass_token_).toString();
+
+  if (hass_url_ != old_url)
+    Q_EMIT hassUrlChanged();
+  if (hass_token_ != old_token)
+    Q_EMIT hassTokenChanged();
+}
+
+void Controler::clearSavedConnection() {
+  QSettings settings;
+  settings.remove(kHassUrlKey);
+  settings.remove(kHassTokenKey);
+  loadConnection();
+}
+
+void Controler::setHassUrl(const QString &url) {
+  if (url == hass_url_)
+    return;
+  hass_url_ = url;
+  QSettings{}.setValue(kHassUrlKey, url);
+  Q_EMIT hassUrlChanged();
+}
+
+void Controler::setHassToken(const QString &token) {
+  if (token == hass_token_)
+    return;
+  hass_token_ = token;
+  QSettings{}.setValue(kHassTokenKey, token);
+  Q_EMIT hassTokenChanged();
+}
+
+int Controler::idleTimeout() const {
+  return std::chrono::duration_cast<std::chrono::seconds>(
+             is_idle_timer_.intervalAsDuration())
+      .count();
+}
+
+void Controler::setIdleTimeout(int seconds) {
+  if (seconds <= 0 || seconds == idleTimeout())
+    return;
+  // setInterval() restarts an active timer, which is what we want: the new
+  // timeout counts from now.
+  is_idle_timer_.setInterval(std::chrono::seconds(seconds));
+  QSettings{}.setValue(kIdleTimeoutKey, seconds);
+  Q_EMIT idleTimeoutChanged();
 }
 
 bool Controler::eventFilter(QObject *obj, QEvent *event) {
@@ -76,11 +119,11 @@ bool Controler::eventFilter(QObject *obj, QEvent *event) {
   return false;
 }
 
-bool Controler::loadConfig(const std::filesystem::path &path) {
-  QFile file(QString::fromStdString(path.string()));
+void Controler::loadConfig() {
+  QFile file(kConfigPath);
   if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
     qCWarning(controller) << "Could not open config file" << file.fileName();
-    return false;
+    return;
   }
 
   while (!file.atEnd()) {
@@ -99,26 +142,4 @@ bool Controler::loadConfig(const std::filesystem::path &path) {
     else if (key == "HASS_TOKEN")
       hass_token_ = QString::fromUtf8(value);
   }
-
-  configuration_path_ = QString::fromStdString(path.string());
-  Q_EMIT configurationPathChanged();
-  return true;
-}
-
-QUrl Controler::pathFor(const QString &config_path) {
-  const std::vector<std::filesystem::path> possibleRootPaths{
-      SOURCE_DIRECTORY, "/usr/share/qt-hass", "/sdcard/qt-hass"};
-
-  auto file_it = std::ranges::find_if(
-      possibleRootPaths, [config_path](const std::filesystem::path &path) {
-        return std::filesystem::exists(path / config_path.toStdString());
-      });
-
-  if (file_it == std::end(possibleRootPaths)) {
-    emit error(QString{"File %1 does not exists"}.arg(config_path));
-    return QUrl{};
-  }
-
-  return QUrl::fromLocalFile(
-      QString::fromStdString(*file_it / config_path.toStdString()));
 }

@@ -7,6 +7,10 @@
 
 int main(int argc, char *argv[]) {
   QGuiApplication app(argc, argv);
+  // Required for QSettings (Controler) and QtCore's Settings (Main.qml) to
+  // share one persistent store.
+  QCoreApplication::setOrganizationName("qt-hass");
+  QCoreApplication::setApplicationName("qthomeassistant");
   QQmlApplicationEngine engine;
 
   QDirIterator it(":", QDirIterator::Subdirectories);

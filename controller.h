@@ -1,14 +1,10 @@
 #ifndef CONTROLLER
 #define CONTROLLER
 
-#include <QtCore/QFileSystemWatcher>
 #include <QtCore/QObject>
 #include <QtCore/QTimer>
 #include <QtCore/QVariant>
-#include <QtCore/QUrl>
 #include <QtQml/qqmlregistration.h>
-
-#include <filesystem>
 
 class QQmlEngine;
 class QJSEngine;
@@ -17,8 +13,13 @@ class Controler : public QObject {
   Q_OBJECT
   QML_ELEMENT
   QML_SINGLETON
-  Q_PROPERTY(QString configurationPath READ configurationPath NOTIFY
-                 configurationPathChanged);
+  Q_PROPERTY(QString hassUrl READ hassUrl WRITE setHassUrl NOTIFY
+                 hassUrlChanged)
+  Q_PROPERTY(QString hassToken READ hassToken WRITE setHassToken NOTIFY
+                 hassTokenChanged)
+  // Seconds without user input before idle(true) is emitted.
+  Q_PROPERTY(int idleTimeout READ idleTimeout WRITE setIdleTimeout NOTIFY
+                 idleTimeoutChanged)
 
 public:
   static Controler *create(QQmlEngine *, QJSEngine *) {
@@ -30,23 +31,29 @@ public:
 
   Controler(QObject *parent = nullptr);
 
-  QString configurationPath() const noexcept { return configuration_path_; }
-
-  // Fallback for HASS_URL/HASS_TOKEN on platforms with no process
-  // environment to inherit them from (Android). Populated from the first
-  // config file found among the paths loadConfig() searches, in KEY=VALUE
-  // form.
+  // HASS_URL/HASS_TOKEN, resolved in increasing priority from the bundled
+  // :/qt-hass/config resource (generated from .envrc at configure time), the
+  // process environment, and values saved from the settings page. Setting
+  // them saves them; HassAPI::reconnect() picks them up.
   QString hassUrl() const noexcept { return hass_url_; }
   QString hassToken() const noexcept { return hass_token_; }
+  void setHassUrl(const QString &url);
+  void setHassToken(const QString &token);
+  // Forgets URL/token saved from the settings page, falling back to the
+  // environment and bundled config again.
+  Q_INVOKABLE void clearSavedConnection();
 
-  Q_INVOKABLE QUrl pathFor(const QString& file);
+  int idleTimeout() const;
+  void setIdleTimeout(int seconds);
 
 protected:
   bool eventFilter(QObject *obj, QEvent *event) override;
 
 signals:
 
-  void configurationPathChanged();
+  void hassUrlChanged();
+  void hassTokenChanged();
+  void idleTimeoutChanged();
 
   void idle(bool);
   void requestDetails(QString entity_id, QString friendly_name);
@@ -59,15 +66,13 @@ signals:
   void hassApiRequestDataUpdated(QString entity_id, QVariant data);
 
 private:
-  // Returns false (after logging a warning) if `path` couldn't be opened.
-  bool loadConfig(const std::filesystem::path &path);
+  void loadConfig();
+  void loadConnection();
 
   static Controler *s_instance;
 
   bool has_user_interaction_;
   QTimer is_idle_timer_;
-  QFileSystemWatcher configuration_file_watcher_;
-  QString configuration_path_;
   QString hass_url_;
   QString hass_token_;
 };
