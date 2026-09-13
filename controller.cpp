@@ -6,7 +6,9 @@
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QStandardPaths>
+#include <QtCore/QTextStream>
 #include <QtCore/QtDebug>
+#include <QtNetwork/QNetworkInterface>
 
 #include <QtCore/qloggingcategory.h>
 #include <chrono>
@@ -33,15 +35,16 @@ const std::vector<std::filesystem::path> kPossibleConfigPaths{
 } // namespace
 
 Controler::Controler(QObject *parent)
-    : QObject(parent), has_user_interaction_(false) {
+    : QObject(parent), has_user_interaction_(false),
+      idle_timeout_seconds_(
+          std::chrono::duration_cast<std::chrono::seconds>(kDefaultIdleTimeout)
+              .count()) {
 
   is_idle_timer_.setInterval(
       std::chrono::duration_cast<std::chrono::milliseconds>(kDefaultIdleTimeout)
           .count());
-  connect(&is_idle_timer_, &QTimer::timeout, this, [this]() {
-    qDebug() << "idle";
-    Q_EMIT idle(true);
-  });
+  connect(&is_idle_timer_, &QTimer::timeout, this,
+          [this]() { setScreensaverActive(true); });
 
   connect(
       &configuration_file_watcher_, &QFileSystemWatcher::fileChanged,
@@ -68,12 +71,49 @@ bool Controler::eventFilter(QObject *obj, QEvent *event) {
       event->type() == QEvent::KeyPress ||
       event->type() == QEvent::MouseButtonPress ||
       event->type() == QEvent::MouseButtonDblClick) {
-    Q_EMIT idle(false);
-    is_idle_timer_.start();
+    setScreensaverActive(false);
     has_user_interaction_ = true;
   }
 
   return false;
+}
+
+void Controler::setScreensaverActive(bool active) {
+  if (screensaver_active_ != active) {
+    screensaver_active_ = active;
+    Q_EMIT screensaverActiveChanged();
+  }
+  // Any explicit "off" -- whether from local interaction or a remote
+  // stopScreensaver command -- rearms the countdown, since is_idle_timer_ is
+  // single-shot and would otherwise never fire again.
+  if (!active)
+    is_idle_timer_.start();
+}
+
+void Controler::setHassConnected(bool connected) {
+  if (hass_connected_ == connected)
+    return;
+  hass_connected_ = connected;
+  Q_EMIT hassConnectedChanged();
+}
+
+void Controler::setIdleTimeoutSeconds(int seconds) {
+  if (idle_timeout_seconds_ == seconds)
+    return;
+  applyIdleTimeoutSeconds(seconds);
+  saveConfig();
+}
+
+void Controler::applyIdleTimeoutSeconds(int seconds) {
+  idle_timeout_seconds_ = seconds;
+  is_idle_timer_.setInterval(
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::seconds(seconds))
+          .count());
+  if (!screensaver_active_)
+    is_idle_timer_.start();
+
+  Q_EMIT idleTimeoutSecondsChanged();
 }
 
 bool Controler::loadConfig(const std::filesystem::path &path) {
@@ -98,11 +138,89 @@ bool Controler::loadConfig(const std::filesystem::path &path) {
       hass_url_ = QString::fromUtf8(value);
     else if (key == "HASS_TOKEN")
       hass_token_ = QString::fromUtf8(value);
+    else if (key == "IDLE_TIMEOUT_SECONDS") {
+      bool ok = false;
+      const int seconds = value.toInt(&ok);
+      if (ok)
+        applyIdleTimeoutSeconds(seconds);
+    } else if (key == "REMOTE_ADMIN_PASSWORD")
+      remote_admin_password_ = QString::fromUtf8(value);
+    else if (key == "REMOTE_ADMIN_PORT") {
+      bool ok = false;
+      const int port = value.toInt(&ok);
+      if (ok)
+        remote_admin_port_ = port;
+    } else if (key == "MQTT_BROKER_HOST")
+      mqtt_broker_host_ = QString::fromUtf8(value);
+    else if (key == "MQTT_BROKER_PORT") {
+      bool ok = false;
+      const int port = value.toInt(&ok);
+      if (ok)
+        mqtt_broker_port_ = port;
+    } else if (key == "MQTT_USERNAME")
+      mqtt_username_ = QString::fromUtf8(value);
+    else if (key == "MQTT_PASSWORD")
+      mqtt_password_ = QString::fromUtf8(value);
   }
 
   configuration_path_ = QString::fromStdString(path.string());
+  qCInfo(controller()) << configuration_path_;
   Q_EMIT configurationPathChanged();
   return true;
+}
+
+void Controler::saveConfig() {
+  if (configuration_path_.isEmpty()) {
+    // No config file was ever found -- create one so settings have
+    // somewhere to persist. hass_url_/hass_token_ are empty in this case
+    // too (nothing populated them), so this writes them out as blank; that's
+    // fine, since a blank HASS_URL/HASS_TOKEN here just means the previous
+    // state (no config file at all) is preserved for those two keys.
+    const auto path = std::filesystem::path{
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation)
+            .toStdString()} /
+        "qt-hass" / "config";
+    QDir{}.mkpath(QString::fromStdString(path.parent_path().string()));
+    configuration_path_ = QString::fromStdString(path.string());
+    configuration_file_watcher_.addPath(configuration_path_);
+  }
+
+  QFile file(configuration_path_);
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+    qCWarning(controller) << "Could not write config file" << file.fileName();
+    return;
+  }
+
+  QTextStream out(&file);
+  if (!hass_url_.isEmpty())
+    out << "HASS_URL=" << hass_url_ << "\n";
+  if (!hass_token_.isEmpty())
+    out << "HASS_TOKEN=" << hass_token_ << "\n";
+  out << "IDLE_TIMEOUT_SECONDS=" << idle_timeout_seconds_ << "\n";
+  if (!remote_admin_password_.isEmpty())
+    out << "REMOTE_ADMIN_PASSWORD=" << remote_admin_password_ << "\n";
+  out << "REMOTE_ADMIN_PORT=" << remote_admin_port_ << "\n";
+  if (!mqtt_broker_host_.isEmpty()) {
+    out << "MQTT_BROKER_HOST=" << mqtt_broker_host_ << "\n";
+    out << "MQTT_BROKER_PORT=" << mqtt_broker_port_ << "\n";
+  }
+  if (!mqtt_username_.isEmpty())
+    out << "MQTT_USERNAME=" << mqtt_username_ << "\n";
+  if (!mqtt_password_.isEmpty())
+    out << "MQTT_PASSWORD=" << mqtt_password_ << "\n";
+}
+
+QString Controler::deviceId() const {
+  for (const QNetworkInterface &iface : QNetworkInterface::allInterfaces()) {
+    if (iface.flags().testFlag(QNetworkInterface::IsLoopBack))
+      continue;
+    const QString mac = iface.hardwareAddress();
+    if (!mac.isEmpty() && mac != QLatin1String("00:00:00:00:00:00"))
+      return mac;
+  }
+  // No real interface found (sandboxed/virtual environment) -- a
+  // locally-administered placeholder so the id is still non-empty.
+  return QStringLiteral("02:00:00:00:00:00");
 }
 
 QUrl Controler::pathFor(const QString &config_path) {

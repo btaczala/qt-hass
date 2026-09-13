@@ -24,9 +24,22 @@ ApplicationWindow {
         source: Controler.pathFor("default_dashboard/Dashboard.qml")
     }
 
+    Screensaver {
+        visible: Controler.screensaverActive
+    }
+
     Component.onCompleted: {
         HassAPI.connect();
     }
 
-    IconImage{}
+    // Mirrors HassAPI.connected onto Controler.hassConnected -- RemoteAdmin
+    // (C++) needs this for the deviceInfo command, but has no reliable way
+    // to reach the live HassAPI singleton itself, so it reads through
+    // Controler instead. See controller.h.
+    Connections {
+        target: HassAPI
+        function onConnectedChanged() {
+            Controler.hassConnected = HassAPI.connected;
+        }
+    }
 }

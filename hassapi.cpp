@@ -14,20 +14,12 @@ Q_DECLARE_LOGGING_CATEGORY(hassAPI)
 Q_LOGGING_CATEGORY(hassAPI, "qthass.api")
 
 namespace {
-// qEnvironmentVariable() finds nothing on Android, which has no process
-// environment to inherit HASS_URL/HASS_TOKEN from -- Controler::loadConfig()
-// covers that case from a config file instead.
-QUrl defaultUrl() {
-  QString url = qEnvironmentVariable("HASS_URL");
-  if (url.isEmpty())
-    url = Controler::create(nullptr, nullptr)->hassUrl();
-  return QUrl{url};
-}
+// HASS_URL/HASS_TOKEN come solely from Controler's config file (see
+// controller.cpp's loadConfig()) -- there is no environment-variable
+// fallback, on any platform.
+QUrl defaultUrl() { return QUrl{Controler::create(nullptr, nullptr)->hassUrl()}; }
 QString defaultAccessToken() {
-  QString token = qEnvironmentVariable("HASS_TOKEN");
-  if (token.isEmpty())
-    token = Controler::create(nullptr, nullptr)->hassToken();
-  return token;
+  return Controler::create(nullptr, nullptr)->hassToken();
 }
 } // namespace
 

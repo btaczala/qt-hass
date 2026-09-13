@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD 23)
 
 find_package(
   Qt6 6.7
-  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2
+  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2 Network Mqtt
   REQUIRED)
 
 if(QT_KNOWN_POLICY_QTP0002)
@@ -77,13 +77,15 @@ qt_add_qml_module(
   qml/TileFeature.qml
   qml/MdiIcon.qml
   qml/IconImage.qml
+  qml/Screensaver.qml
   qml/Cards/Weather.qml
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
   RESOURCES
   fonts/materialdesignicons-webfont.ttf
   images/lightbulb.svg
-  images/lightbulb-off.svg)
+  images/lightbulb-off.svg
+  images/screensaver.gif)
 
 # Qt only looks for the Controls configuration at :/qtquickcontrols2.conf, and
 # qt_add_qml_module pins its RESOURCES under RESOURCE_PREFIX/URI -- so this file
@@ -102,7 +104,13 @@ set_target_properties(
 
 target_link_libraries(
   qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
-                          Qt6::QuickControls2)
+                          Qt6::QuickControls2 Qt6::Network Qt6::Mqtt)
+
+# Plain QObjects, not QML types -- unlike hassapi.cpp/controller.cpp (which
+# are QML_SINGLETONs and belong in qt_add_qml_module's SOURCES above), the
+# remote admin server and MQTT publisher have no QML surface.
+target_sources(qthomeassistant PRIVATE remoteadmin.h remoteadmin.cpp
+                                       mqttpublisher.h mqttpublisher.cpp)
 
 # qt_add_qml_module's generated type registration includes headers by basename,
 # so src/ has to be reachable the same way the root-level headers are.
@@ -110,7 +118,8 @@ target_include_directories(qthomeassistant PRIVATE src
                                                    ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 target_compile_definitions(qthomeassistant
-                           PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}")
+                           PRIVATE SOURCE_DIRECTORY="${CMAKE_SOURCE_DIR}"
+                                   APP_VERSION="${PROJECT_VERSION}")
 
 # Android doesn't expose OpenSSL to NDK apps, so QtWebSockets has no TLS backend
 # for wss:// unless we bundle it ourselves. Prebuilt from
@@ -139,8 +148,8 @@ endif()
 
 if(ANDROID)
   # `cmake --build <dir> --target run`: install the just-built APK on
-  # whatever device `adb` currently targets, push a device-local config
-  # derived from .envrc, and launch it. The package name is the
+  # whatever device `adb` currently targets, push the desktop `config` file
+  # to the device, and launch it. The package name is the
   # org.qtproject.example.<target> androiddeployqt falls back to since
   # nothing here sets QT_ANDROID_PACKAGE_NAME -- update it here if that ever
   # changes. QtActivity itself is Qt's own fixed Android bindings class, not
@@ -158,10 +167,10 @@ if(ANDROID)
               "${CMAKE_CURRENT_BINARY_DIR}/android-build/qthomeassistant.apk"
       # `run-as` needs the app already installed (its data dir must exist),
       # so this has to come after install and before the app starts. Dev
-      # convenience only -- re-derives HASS_URL/HASS_TOKEN from .envrc every
-      # time rather than provisioning the device once, see the script.
+      # convenience only -- re-pushes the desktop `config` file every time
+      # rather than provisioning the device once, see the script.
       COMMAND ${Python3_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/tools/push_android_config.py"
-              --envrc "${CMAKE_CURRENT_SOURCE_DIR}/.envrc"
+              --config "${CMAKE_CURRENT_SOURCE_DIR}/config"
               --package ${ANDROID_PACKAGE_NAME}
               --out "${CMAKE_CURRENT_BINARY_DIR}/config"
               --adb ${ADB_EXECUTABLE}
