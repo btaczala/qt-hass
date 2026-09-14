@@ -67,8 +67,11 @@ Pane {
     // The diagram is laid out in these fixed units, then drawn at
     // diagramScale. The card sizes itself to the diagram: collapsedHeight
     // without the consumers row, expandedHeight with it, animating between
-    // the two as the row fades. Give it a diagramScale at which the expanded
-    // height still fits, so toggling never rescales anything.
+    // the two as the row fades. diagramScale is picked (by PageEnergy.qml) to
+    // fit collapsedHeight, so the default view isn't shrunk to make room for
+    // a row that's hidden most of the time; on screens too short for the
+    // expanded height too, the consumers row simply clips instead of
+    // rescaling the whole diagram down.
     readonly property real designWidth: 580
     readonly property real collapsedHeight: 520
     readonly property real expandedHeight: 670

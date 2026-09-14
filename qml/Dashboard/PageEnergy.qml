@@ -29,18 +29,23 @@ Item {
         }
 
         // The card sizes itself and grows downwards when its consumers row is
-        // shown; this area only decides the scale, picked so the expanded card
-        // still fits.
+        // shown; this area only decides the scale, picked so the *collapsed*
+        // card (the default state) fills the available space -- fitting the
+        // expanded height instead left the diagram tiny on short/square
+        // screens (confirmed on an NSPanel Pro) for a row that's hidden most
+        // of the time. clip: true crops the consumers row instead, on screens
+        // too short for it once the diagram is scaled up like this.
         Item {
             id: cardArea
             Layout.fillWidth: true
             Layout.fillHeight: true
+            clip: true
 
             EnergyFlowCard {
                 id: card
                 anchors.horizontalCenter: parent.horizontalCenter
                 diagramScale: Math.min((cardArea.width - card.leftPadding - card.rightPadding) / card.designWidth,
-                                       (cardArea.height - card.topPadding - card.bottomPadding) / card.expandedHeight)
+                                       (cardArea.height - card.topPadding - card.bottomPadding) / card.collapsedHeight)
 
                 solarPower: source.solarPower
                 gridPower: source.gridPower
