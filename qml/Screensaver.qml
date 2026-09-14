@@ -4,10 +4,10 @@ import QtQuick
 import QtQuick.Controls
 import QtHomeAssistant
 
-// Idle-triggered (or remotely forced, via RemoteAdmin) screensaver: a clock,
-// the weather and a home energy summary, dim on black, that jump to a new
-// random spot every minute, so nothing stays lit in one place long enough to
-// burn in (DoNotDisturb draws over it). Shown by binding `visible` to
+// Idle-triggered (or remotely forced, via RemoteAdmin) screensaver, dim on
+// black: a clock and the weather that jump to a new random spot every minute,
+// so they don't stay lit in one place long enough to burn in, above a home
+// energy summary kept along the bottom edge (DoNotDisturb draws over it). Shown by binding `visible` to
 // Controler.screensaverActive in Main.qml. Being modal, it
 // swallows clicks/touches before they reach the dashboard underneath, so it
 // has to dismiss itself on tap rather than rely on Controler's eventFilter
@@ -31,11 +31,17 @@ Popup {
     required property string weatherEntity
     required property var energyEntities
 
+    // Only while shown and connected: nothing to read otherwise.
+    readonly property bool live: screensaver.visible && HassAPI.connected
+    // Scales everything.
+    readonly property real unit: Math.min(screensaver.width, screensaver.height)
+
     background: Rectangle {
         color: "black"
     }
 
-    // Clock, weather and energy move around together.
+    // Clock and weather move around together, in the room above the energy
+    // summary.
     Column {
         id: panel
 
@@ -49,11 +55,11 @@ Popup {
             panel.fractionY = Math.random();
         }
 
-        // Scales the whole panel.
-        readonly property real unit: Math.min(screensaver.width, screensaver.height)
+        readonly property real unit: screensaver.unit
+        readonly property real room: energy.visible ? energy.y - panel.unit * 0.05 : screensaver.height
 
         x: panel.fractionX * Math.max(0, screensaver.width - panel.width)
-        y: panel.fractionY * Math.max(0, screensaver.height - panel.height)
+        y: panel.fractionY * Math.max(0, panel.room - panel.height)
         spacing: panel.unit * 0.05
 
         Behavior on opacity {
@@ -78,27 +84,14 @@ Popup {
             }
         }
 
-        // Only while shown and connected: nothing to read otherwise.
         Loader {
             anchors.horizontalCenter: parent.horizontalCenter
-            active: screensaver.visible && HassAPI.connected
+            active: screensaver.live
             visible: active
 
-            sourceComponent: Column {
-                spacing: panel.unit * 0.05
-
-                WeatherSummary {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    entityId: screensaver.weatherEntity
-                    fontSize: panel.unit * 0.045
-                }
-                EnergySummary {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    entities: screensaver.energyEntities
-                    fontSize: panel.unit * 0.036
-                    // Two by two unless the screen is wide enough for a row.
-                    columns: screensaver.width > screensaver.height * 1.5 ? 4 : 2
-                }
+            sourceComponent: WeatherSummary {
+                entityId: screensaver.weatherEntity
+                fontSize: panel.unit * 0.045
             }
         }
 
@@ -109,6 +102,22 @@ Popup {
                 panel.relocate();
                 panel.opacity = 1;
             }
+        }
+    }
+
+    Loader {
+        id: energy
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: screensaver.unit * 0.04
+        active: screensaver.live
+        visible: active
+
+        sourceComponent: EnergySummary {
+            entities: screensaver.energyEntities
+            fontSize: screensaver.unit * 0.036
+            // Two by two unless the screen is wide enough for a row.
+            columns: screensaver.width > screensaver.height * 1.5 ? 4 : 2
         }
     }
 
