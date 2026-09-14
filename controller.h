@@ -1,14 +1,11 @@
 #ifndef CONTROLLER
 #define CONTROLLER
 
-#include <QtCore/QFileSystemWatcher>
+#include <QtCore/QHash>
 #include <QtCore/QObject>
 #include <QtCore/QTimer>
 #include <QtCore/QVariant>
-#include <QtCore/QUrl>
 #include <QtQml/qqmlregistration.h>
-
-#include <filesystem>
 
 class QQmlEngine;
 class QJSEngine;
@@ -24,10 +21,13 @@ class Controler : public QObject {
   Q_OBJECT
   QML_ELEMENT
   QML_SINGLETON
-  Q_PROPERTY(QString configurationPath READ configurationPath NOTIFY
-                 configurationPathChanged);
+  Q_PROPERTY(QString hassUrl READ hassUrl WRITE setHassUrl NOTIFY
+                 hassUrlChanged)
+  Q_PROPERTY(QString hassToken READ hassToken WRITE setHassToken NOTIFY
+                 hassTokenChanged)
   Q_PROPERTY(bool screensaverActive READ screensaverActive WRITE
                  setScreensaverActive NOTIFY screensaverActiveChanged);
+  // Seconds without user input before the screensaver starts.
   Q_PROPERTY(int idleTimeoutSeconds READ idleTimeoutSeconds WRITE
                  setIdleTimeoutSeconds NOTIFY idleTimeoutSecondsChanged);
   Q_PROPERTY(bool hassConnected READ hassConnected WRITE setHassConnected
@@ -43,19 +43,23 @@ public:
 
   Controler(QObject *parent = nullptr);
 
-  QString configurationPath() const noexcept { return configuration_path_; }
-
-  // The sole source of HASS_URL/HASS_TOKEN on every platform -- there is no
-  // environment-variable fallback (hassapi.cpp's defaultUrl()/
-  // defaultAccessToken() read these directly). Populated from the first
-  // config file found among the paths loadConfig() searches, in KEY=VALUE
-  // form.
+  // HASS_URL/HASS_TOKEN, resolved in increasing priority from the bundled
+  // :/qt-hass/config resource (generated at configure time), the process
+  // environment, and values saved from the settings page. Setting them saves
+  // them; HassAPI::reconnect() picks them up.
   QString hassUrl() const noexcept { return hass_url_; }
   QString hassToken() const noexcept { return hass_token_; }
+  void setHassUrl(const QString &url);
+  void setHassToken(const QString &token);
+  // Forgets URL/token saved from the settings page, falling back to the
+  // environment and bundled config again.
+  Q_INVOKABLE void clearSavedConnection();
 
   bool screensaverActive() const noexcept { return screensaver_active_; }
   void setScreensaverActive(bool active);
 
+  // Defaults to the bundled IDLE_TIMEOUT_SECONDS (or 60); changes from the
+  // settings page or RemoteAdmin are saved to QSettings.
   int idleTimeoutSeconds() const noexcept { return idle_timeout_seconds_; }
   void setIdleTimeoutSeconds(int seconds);
 
@@ -66,17 +70,18 @@ public:
   bool hassConnected() const noexcept { return hass_connected_; }
   void setHassConnected(bool connected);
 
-  // Remote Admin (RemoteAdmin) config -- empty password means the server
-  // never starts listening, see remoteadmin.cpp.
-  QString remoteAdminPassword() const noexcept { return remote_admin_password_; }
-  int remoteAdminPort() const noexcept { return remote_admin_port_; }
+  // Remote Admin (RemoteAdmin) config, from the bundled config -- empty
+  // password means the server never starts listening, see remoteadmin.cpp.
+  QString remoteAdminPassword() const { return bundledValue("REMOTE_ADMIN_PASSWORD"); }
+  int remoteAdminPort() const { return bundledInt("REMOTE_ADMIN_PORT", 2323); }
 
-  // MqttPublisher config -- empty host means it never connects, same gating
-  // pattern as remoteAdminPassword() above. See mqttpublisher.cpp.
-  QString mqttBrokerHost() const noexcept { return mqtt_broker_host_; }
-  int mqttBrokerPort() const noexcept { return mqtt_broker_port_; }
-  QString mqttUsername() const noexcept { return mqtt_username_; }
-  QString mqttPassword() const noexcept { return mqtt_password_; }
+  // MqttPublisher config, from the bundled config -- empty host means it
+  // never connects, same gating pattern as remoteAdminPassword() above. See
+  // mqttpublisher.cpp.
+  QString mqttBrokerHost() const { return bundledValue("MQTT_BROKER_HOST"); }
+  int mqttBrokerPort() const { return bundledInt("MQTT_BROKER_PORT", 1883); }
+  QString mqttUsername() const { return bundledValue("MQTT_USERNAME"); }
+  QString mqttPassword() const { return bundledValue("MQTT_PASSWORD"); }
 
   // A stable id for this device, shared by RemoteAdmin's deviceInfo
   // (deviceID/Mac) and MqttPublisher's MQTT topic/client id -- the first
@@ -84,18 +89,17 @@ public:
   // placeholder if none is found (sandboxed/virtual environment).
   QString deviceId() const;
 
-  Q_INVOKABLE QUrl pathFor(const QString& file);
-
 protected:
   bool eventFilter(QObject *obj, QEvent *event) override;
 
 signals:
 
-  void configurationPathChanged();
-
+  void hassUrlChanged();
+  void hassTokenChanged();
   void screensaverActiveChanged();
   void idleTimeoutSecondsChanged();
   void hassConnectedChanged();
+
   void requestDetails(QString entity_id, QString friendly_name);
   void configurationChanged(QVariant configuration);
 
@@ -106,37 +110,26 @@ signals:
   void hassApiRequestDataUpdated(QString entity_id, QVariant data);
 
 private:
-  // Returns false (after logging a warning) if `path` couldn't be opened.
-  bool loadConfig(const std::filesystem::path &path);
-  // Writes HASS_URL/HASS_TOKEN and the settings keys below back to
-  // configuration_path_, falling back to AppDataLocation/qt-hass/config if
-  // no config file was ever found (e.g. on desktop, where HASS_URL/TOKEN
-  // normally come from the environment and no config file exists at all).
-  void saveConfig();
-  // Applies a new idle timeout (field + timer + notify) without persisting
-  // it -- used by loadConfig() so reading a value back out of the config
-  // file doesn't turn around and write to that same file while it's still
-  // open for reading. setIdleTimeoutSeconds() is the persisting, public
-  // entry point (used by RemoteAdmin).
-  void applyIdleTimeoutSeconds(int seconds);
+  // Reads the bundled :/qt-hass/config (KEY=VALUE per line) into
+  // bundled_config_.
+  void loadConfig();
+  void loadConnection();
+
+  QString bundledValue(const QString &key) const {
+    return bundled_config_.value(key);
+  }
+  int bundledInt(const QString &key, int fallback) const;
 
   static Controler *s_instance;
 
   bool has_user_interaction_;
   bool screensaver_active_{false};
   bool hass_connected_{false};
-  int idle_timeout_seconds_;
+  int idle_timeout_seconds_{60};
   QTimer is_idle_timer_;
-  QFileSystemWatcher configuration_file_watcher_;
-  QString configuration_path_;
+  QHash<QString, QString> bundled_config_;
   QString hass_url_;
   QString hass_token_;
-  QString remote_admin_password_;
-  int remote_admin_port_{2323};
-  QString mqtt_broker_host_;
-  int mqtt_broker_port_{1883};
-  QString mqtt_username_;
-  QString mqtt_password_;
 };
 
 #endif // !CONTROLLER

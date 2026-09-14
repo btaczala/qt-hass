@@ -30,6 +30,9 @@ public:
 
 public slots:
   void connect();
+  // Drops the current connection, if any, and connects again with the URL and
+  // token currently set on Controler.
+  void reconnect();
   void registerStateChanges(QString, QJSValue);
   // Must be called with the exact same (entity_id, fn) pair passed to
   // registerStateChanges before the QML object owning fn is destroyed --

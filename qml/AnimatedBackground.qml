@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls.Material
 
 // A smooth color-changing background, the Qt Quick take on the CSS animated
 // gradient: a diagonal gradient several screens long slides slowly back and
@@ -10,8 +11,20 @@ import QtQuick
 Item {
     id: root
 
-    // Colors along the gradient, in order; the first four are used.
-    property list<color> colors: ["#10263f", "#1f5f73", "#4b2a6b", "#7c3a55"]
+    // Colors along the gradient, in order; the first four are used. Follows
+    // the app's Material theme (System already resolved to Light or Dark).
+    property list<color> darkColors: ["#10263f", "#1f5f73", "#4b2a6b", "#7c3a55"]
+    property list<color> lightColors: ["#d6e6f5", "#cdeae8", "#e2d9f1", "#f3dce5"]
+    property list<color> colors: root.Material.theme === Material.Dark ? root.darkColors : root.lightColors
+
+    // Crossfades the gradient when the theme changes.
+    component FadingStop: GradientStop {
+        Behavior on color {
+            ColorAnimation {
+                duration: 400
+            }
+        }
+    }
     // Time to slide from one end of the gradient to the other.
     property int duration: 20000
 
@@ -34,19 +47,19 @@ Item {
             height: parent.height * root.span
 
             gradient: Gradient {
-                GradientStop {
+                FadingStop {
                     position: 0
                     color: root.colors[0]
                 }
-                GradientStop {
+                FadingStop {
                     position: 1 / 3
                     color: root.colors[1]
                 }
-                GradientStop {
+                FadingStop {
                     position: 2 / 3
                     color: root.colors[2]
                 }
-                GradientStop {
+                FadingStop {
                     position: 1
                     color: root.colors[3]
                 }
