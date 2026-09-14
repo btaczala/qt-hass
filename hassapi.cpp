@@ -319,6 +319,8 @@ void HassAPI::eventHandler(QJsonDocument payload) {
     state["entity_id"] = it.key();
     state["state"] = entity["s"];
     state["attributes"] = entity["a"];
+    // Seconds since the epoch, as HA sends it.
+    state["last_changed"] = entity["lc"];
     entity_states_[it.key()] = state;
     invokeCallbacks(it.key());
   }
@@ -343,6 +345,8 @@ void HassAPI::applyStateDiff(const QString &entity_id,
   const auto plus = diff["+"].toObject();
   if (plus.contains("s"))
     state["state"] = plus["s"];
+  if (plus.contains("lc"))
+    state["last_changed"] = plus["lc"];
   const auto added_attributes = plus["a"].toObject();
   for (auto it = added_attributes.constBegin();
        it != added_attributes.constEnd(); ++it)

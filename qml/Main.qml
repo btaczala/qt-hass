@@ -80,6 +80,18 @@ ApplicationWindow {
 
     Screensaver {
         visible: Controler.screensaverActive
+        weatherEntity: "weather.pirateweather"
+        // The same sensors as the list at the top of Dashboard/PageEnergy.qml.
+        energyEntities: ({
+                solarPower: "sensor.selfa_inverter_pv_input_power",
+                homePower: "sensor.selfa_inverter_home_power",
+                gridPower: "sensor.selfa_inverter_grid_meter_power_inverted",
+                batteryPower: "sensor.selfa_inverter_battery_power",
+                batterySoc: "sensor.selfa_inverter_battery_soc",
+                solarEnergyToday: "sensor.selfa_inverter_daily_pv_generation",
+                homeEnergyToday: "sensor.selfa_inverter_daily_load_consumption",
+                solarForecastToday: "sensor.solcast_pv_forecast_prognoza_na_dzisiaj"
+            })
     }
 
     DoNotDisturb {

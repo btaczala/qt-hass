@@ -18,6 +18,8 @@ Popup {
 
     required property string entity_id
     property string name
+    // Shown under the name, when set.
+    property CameraSensors sensors
 
     property bool loading: false
     property string error: ""
@@ -102,12 +104,25 @@ Popup {
             anchors.margins: 12
             spacing: 10
 
-            Label {
+            ColumnLayout {
                 Layout.fillWidth: true
-                text: root.name
-                color: "white"
-                font.pixelSize: 18
-                elide: Text.ElideRight
+                spacing: 6
+
+                Label {
+                    Layout.fillWidth: true
+                    text: root.name
+                    color: "white"
+                    font.pixelSize: 18
+                    elide: Text.ElideRight
+                }
+                Loader {
+                    active: root.sensors !== null
+                    visible: active
+                    sourceComponent: CameraDetails {
+                        sensors: root.sensors
+                        fontSize: 14
+                    }
+                }
             }
             ToolButton {
                 contentItem: MdiIcon {

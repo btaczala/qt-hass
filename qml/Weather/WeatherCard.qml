@@ -7,6 +7,8 @@ import QtQuick.Layouts
 
 import QtHomeAssistant
 
+import "WeatherFormat.js" as WeatherFormat
+
 // A weather card after weather-chart-card: the current condition and
 // temperature with today's high and low, a few of the entity's attributes, and
 // the daily forecast charted (WeatherForecast).
@@ -86,52 +88,9 @@ Pane {
             return {
                 icon: definition.icon,
                 label: definition.label,
-                value: root.formatNumber(root.attributes[key]) + unit
+                value: WeatherFormat.number(root.attributes[key]) + unit
             };
         })
-
-    function conditionName(condition: string): string {
-        switch (condition) {
-        case "clear-night":
-            return qsTr("Clear night");
-        case "cloudy":
-            return qsTr("Cloudy");
-        case "exceptional":
-            return qsTr("Exceptional");
-        case "fog":
-            return qsTr("Fog");
-        case "hail":
-            return qsTr("Hail");
-        case "lightning":
-            return qsTr("Lightning");
-        case "lightning-rainy":
-            return qsTr("Lightning, rainy");
-        case "partlycloudy":
-            return qsTr("Partly cloudy");
-        case "pouring":
-            return qsTr("Pouring");
-        case "rainy":
-            return qsTr("Rainy");
-        case "snowy":
-            return qsTr("Snowy");
-        case "snowy-rainy":
-            return qsTr("Snowy, rainy");
-        case "sunny":
-            return qsTr("Sunny");
-        case "windy":
-            return qsTr("Windy");
-        case "windy-variant":
-            return qsTr("Windy, cloudy");
-        default:
-            return condition;
-        }
-    }
-
-    // At most one decimal, none when whole.
-    function formatNumber(value: var): string {
-        const n = Number(value);
-        return isNaN(n) ? String(value) : Number(Math.round(n * 10) / 10).toLocaleString(Qt.locale(), "f", Number.isInteger(Math.round(n * 10) / 10) ? 0 : 1);
-    }
 
     function refreshForecast() {
         HassAPI.command("call_service", {
@@ -188,7 +147,7 @@ Pane {
 
                 Label {
                     Layout.fillWidth: true
-                    text: root.conditionName(entity.state)
+                    text: WeatherFormat.conditionName(entity.state)
                     font.pixelSize: 28
                     elide: Text.ElideRight
                 }
@@ -204,13 +163,13 @@ Pane {
 
                 Label {
                     Layout.alignment: Qt.AlignRight
-                    text: root.attributes.temperature !== undefined ? root.formatNumber(root.attributes.temperature) + root.temperatureUnit : "—"
+                    text: root.attributes.temperature !== undefined ? WeatherFormat.number(root.attributes.temperature) + root.temperatureUnit : "—"
                     font.pixelSize: 28
                 }
                 Label {
                     Layout.alignment: Qt.AlignRight
                     visible: root.today !== null
-                    text: root.today ? qsTr("%1 / %2").arg(root.formatNumber(root.today.temperature) + root.temperatureUnit).arg(root.today.templow !== undefined ? root.formatNumber(root.today.templow) + root.temperatureUnit : "—") : ""
+                    text: root.today ? qsTr("%1 / %2").arg(WeatherFormat.number(root.today.temperature) + root.temperatureUnit).arg(root.today.templow !== undefined ? WeatherFormat.number(root.today.templow) + root.temperatureUnit : "—") : ""
                     color: root.Material.secondaryTextColor
                 }
             }

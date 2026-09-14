@@ -128,11 +128,14 @@ qt_add_qml_module(
   qml/Dashboard/PageEnergy.qml
   qml/Dashboard/PageCameras.qml
   qml/Cameras/CameraCard.qml
+  qml/Cameras/CameraDetails.qml
+  qml/Cameras/CameraSensors.qml
   qml/Cameras/CameraStreamPopup.qml
   qml/Cameras/CameraUrls.js
   qml/Energy/EnergyFlowCard.qml
   qml/Energy/EnergyFlowLine.qml
   qml/Energy/EnergyNode.qml
+  qml/Energy/EnergySummary.qml
   qml/Energy/HassEnergySource.qml
   qml/Energy/Details/EnergyDetailPopup.qml
   qml/Energy/Details/EnergyChartView.qml
@@ -148,6 +151,8 @@ qt_add_qml_module(
   qml/Weather/WeatherCard.qml
   qml/Weather/WeatherForecast.qml
   qml/Weather/WeatherIcon.qml
+  qml/Weather/WeatherSummary.qml
+  qml/Weather/WeatherFormat.js
   qml/Weather/WindIndicator.qml
   qml/Setup/ErrorLabel.qml
   qml/Setup/HassAuth.qml

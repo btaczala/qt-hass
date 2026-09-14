@@ -8,7 +8,9 @@ import "CameraUrls.js" as CameraUrls
 // A Home Assistant camera as a thumbnail -- HA's own camera_proxy snapshot
 // endpoint, reloaded on a timer -- that opens a full live view
 // (CameraStreamPopup, HLS via QtMultimedia) on tap. Modeled on Lovelace's
-// picture-entity card.
+// picture-entity card. Along the top, CameraDetails shows motion, darkness
+// and the last motion, from the sensors CameraSensors finds for the camera
+// (or the `*Entity` properties).
 EntityBase {
     id: root
 
@@ -17,6 +19,10 @@ EntityBase {
     // frame from the camera on every request, so this is real, if not quite
     // live, movement -- the tap-to-open view is the actual live stream.
     property int refreshSeconds: 10
+    // Optional; found on the camera's device when empty. See CameraSensors.
+    property string motionEntity
+    property string darkEntity
+    property string lastMotionEntity
 
     readonly property var attributes: root.entity_data?.attributes ?? ({})
     readonly property string displayName: root.name || root.attributes.friendly_name || root.entity_id
@@ -40,6 +46,14 @@ EntityBase {
     Material.roundedScale: Material.SmallScale
 
     onProxyPathChanged: root.reload()
+
+    CameraSensors {
+        id: sensors
+        cameraEntity: root.entity_id
+        motionEntity: root.motionEntity
+        darkEntity: root.darkEntity
+        lastMotionEntity: root.lastMotionEntity
+    }
 
     Image {
         id: image
@@ -82,6 +96,13 @@ EntityBase {
         }
     }
 
+    CameraDetails {
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.margins: 8
+        sensors: sensors
+    }
+
     TapHandler {
         onTapped: stream.open()
     }
@@ -99,5 +120,6 @@ EntityBase {
         id: stream
         entity_id: root.entity_id
         name: root.displayName
+        sensors: sensors
     }
 }
