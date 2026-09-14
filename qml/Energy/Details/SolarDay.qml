@@ -7,17 +7,21 @@ import QtHomeAssistant
 
 import "EnergyFormat.js" as EnergyFormat
 
-// Solar overlay: production now and today, a bar of today's production
-// against the forecast, and today's actual production charted against it.
+// One day of solar production, for SolarDetail's tabs: the day's figures, a
+// bar of its production against the forecast, and its production charted
+// (against the forecast curve, when there is one). `live` is today, still
+// going: production now, what's still expected and a "now" marker; otherwise
+// it's a finished day, with its peak instead.
 ColumnLayout {
     id: root
 
+    property bool live: true
     property real power: 0
-    // Wh produced since midnight.
+    // Wh produced that day (so far).
     property real producedEnergy: 0
-    // [{x: hour, y: W}], evenly spaced, covering the whole day.
+    // [{x: hour, y: W}], evenly spaced, covering the whole day; may be empty.
     property var forecast: []
-    // [{x: hour, y: W}] so far today.
+    // [{x: hour, y: W}] that day (so far).
     property var actual: []
     property real nowHour: 0
     property color color: "#ff9800"
@@ -38,22 +42,24 @@ ColumnLayout {
         return sum;
     }
 
-    readonly property real forecastTotal: root.forecastEnergy(0, 24)
-    readonly property real forecastSoFar: root.forecastEnergy(0, root.nowHour)
-    readonly property real forecastRemaining: Math.max(0, root.forecastTotal - root.forecastSoFar)
+    // Wh; from the curve unless set, NaN when unknown.
+    property real forecastTotal: root.forecast.length > 0 ? root.forecastEnergy(0, 24) : NaN
+    readonly property bool hasForecast: !isNaN(root.forecastTotal)
+    readonly property real forecastSoFar: !root.hasForecast ? 0 : root.live ? root.forecastEnergy(0, root.nowHour) : root.forecastTotal
+    readonly property real forecastRemaining: root.live ? Math.max(0, root.forecastTotal - root.forecastSoFar) : 0
     readonly property real peak: Math.max(...root.forecast.map(p => p.y), ...root.actual.map(p => p.y), 0)
+    // The day's highest production reading.
+    readonly property var actualPeak: root.actual.reduce((best, p) => !best || p.y > best.y ? p : best, null)
 
-    // Chart range: daylight hours per the forecast, with an hour either side.
-    readonly property real firstLight: {
-        const p = root.forecast.find(p => p.y > 0);
-        return p ? Math.max(0, Math.floor(p.x) - 1) : 0;
+    // Chart range: daylight hours per the forecast (or, without one, the
+    // production), with an hour either side.
+    readonly property var daylight: {
+        const points = root.forecast.some(p => p.y > 0) ? root.forecast : root.actual;
+        const lit = points.filter(p => p.y > 10);
+        return lit.length ? lit : null;
     }
-    readonly property real lastLight: {
-        for (let i = root.forecast.length - 1; i >= 0; --i)
-            if (root.forecast[i].y > 0)
-                return Math.min(24, Math.ceil(root.forecast[i].x) + 1);
-        return 24;
-    }
+    readonly property real firstLight: root.daylight ? Math.max(0, Math.floor(root.daylight[0].x) - 1) : 0
+    readonly property real lastLight: root.daylight ? Math.min(24, Math.ceil(root.daylight[root.daylight.length - 1].x) + 1) : 24
 
     spacing: 16
 
@@ -66,48 +72,49 @@ ColumnLayout {
         EnergyStat {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
-            label: qsTr("Now")
-            value: EnergyFormat.power(root.power)
+            label: root.live ? qsTr("Now") : qsTr("Peak")
+            value: root.live ? EnergyFormat.power(root.power) : root.actualPeak ? EnergyFormat.power(root.actualPeak.y) : "–"
+            detail: !root.live && root.actualPeak ? qsTr("at %1").arg(EnergyFormat.clock(root.actualPeak.x)) : ""
             color: root.color
         }
         EnergyStat {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
-            label: qsTr("Produced today")
+            label: root.live ? qsTr("Produced today") : qsTr("Produced")
             value: EnergyFormat.energy(root.producedEnergy)
-            detail: root.forecastSoFar > 100 ? qsTr("%1 % of forecast so far").arg(Math.round(100 * root.producedEnergy / root.forecastSoFar)) : ""
+            detail: root.forecastSoFar > 100 ? (root.live ? qsTr("%1 % of forecast so far") : qsTr("%1 % of forecast")).arg(Math.round(100 * root.producedEnergy / root.forecastSoFar)) : ""
         }
         EnergyStat {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
-            label: qsTr("Forecast today")
-            value: EnergyFormat.energy(root.forecastTotal)
+            label: root.live ? qsTr("Forecast today") : qsTr("Forecast")
+            value: root.hasForecast ? EnergyFormat.energy(root.forecastTotal) : "–"
         }
         EnergyStat {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
-            label: qsTr("Still expected")
-            value: EnergyFormat.energy(root.forecastRemaining)
+            label: root.live ? qsTr("Still expected") : !root.hasForecast ? qsTr("Against forecast") : root.producedEnergy >= root.forecastTotal ? qsTr("Above forecast") : qsTr("Below forecast")
+            value: root.live ? EnergyFormat.energy(root.forecastRemaining) : root.hasForecast ? EnergyFormat.energy(Math.abs(root.producedEnergy - root.forecastTotal)) : "–"
         }
     }
 
-    // Today's production on a scale of the day's forecast: what's produced so
+    // The day's production on a scale of its forecast: what's produced so
     // far, in a red-orange-green gradient spanning the whole bar (so the
     // color at its end shows how far along the forecast the day is), then
     // what's still expected, and a tick where the forecast says production
-    // should be by now.
+    // should be by now (at the end of a finished day: the forecast itself).
     Item {
         id: progress
         Layout.fillWidth: true
         implicitHeight: 14
 
-        readonly property real total: Math.max(1, root.forecastTotal, root.producedEnergy + root.forecastRemaining)
+        readonly property real total: Math.max(1, root.hasForecast ? root.forecastTotal : 0, root.producedEnergy + root.forecastRemaining)
         readonly property real producedFraction: Math.min(1, root.producedEnergy / progress.total)
         readonly property real expectedFraction: Math.min(1 - progress.producedFraction, root.forecastRemaining / progress.total)
         readonly property color trackColor: Qt.rgba(root.Material.foreground.r, root.Material.foreground.g, root.Material.foreground.b, 0.1)
 
         Accessible.role: Accessible.ProgressBar
-        Accessible.name: qsTr("Produced %1 of %2 forecast, %3 still expected").arg(EnergyFormat.energy(root.producedEnergy)).arg(EnergyFormat.energy(root.forecastTotal)).arg(EnergyFormat.energy(root.forecastRemaining))
+        Accessible.name: qsTr("Produced %1 of %2 forecast, %3 still expected").arg(EnergyFormat.energy(root.producedEnergy)).arg(root.hasForecast ? EnergyFormat.energy(root.forecastTotal) : "–").arg(EnergyFormat.energy(root.forecastRemaining))
 
         Rectangle {
             anchors.fill: parent
@@ -169,7 +176,7 @@ ColumnLayout {
 
         xMin: solarX.min
         xMax: solarX.max
-        nowX: root.nowHour
+        nowX: root.live ? root.nowHour : NaN
 
         // Charted in kW.
         readonly property real yStep: chart.niceStep(root.peak / 1000)
@@ -196,6 +203,7 @@ ColumnLayout {
         LineSeries {
             id: forecastSeries
             name: qsTr("Forecast")
+            visible: root.forecast.length > 0
             axisX: solarX
             axisY: solarY
             color: root.Material.hintTextColor

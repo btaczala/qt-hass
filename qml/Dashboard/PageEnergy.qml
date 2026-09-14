@@ -119,9 +119,19 @@ Item {
     readonly property string gridImportTotalEntity: "sensor.selfa_inverter_total_grid_purchase"
     readonly property string gridExportTotalEntity: "sensor.selfa_inverter_total_grid_injection"
     readonly property string homeEnergyTotalEntity: "sensor.selfa_inverter_home_energy"
+    readonly property string solarEnergyTotalEntity: "sensor.selfa_inverter_total_pv_generation"
 
     // Solar forecast (Solcast)
     readonly property string solarForecastEntity: "sensor.solcast_pv_forecast_prognoza_na_dzisiaj"
+    // From tomorrow on.
+    readonly property var solarForecastDayEntities: [
+        "sensor.solcast_pv_forecast_prognoza_na_jutro",
+        "sensor.solcast_pv_forecast_prognoza_na_dzien_3",
+        "sensor.solcast_pv_forecast_prognoza_na_dzien_4",
+        "sensor.solcast_pv_forecast_prognoza_na_dzien_5",
+        "sensor.solcast_pv_forecast_prognoza_na_dzien_6",
+        "sensor.solcast_pv_forecast_prognoza_na_dzien_7"
+    ]
 
     // Prices (Pstryk)
     readonly property string buyPriceEntity: "sensor.pstryk_current_buy_price"
@@ -144,7 +154,9 @@ Item {
         gridImportTotalEntity: root.gridImportTotalEntity
         gridExportTotalEntity: root.gridExportTotalEntity
         homeEnergyTotalEntity: root.homeEnergyTotalEntity
+        solarEnergyTotalEntity: root.solarEnergyTotalEntity
         solarForecastEntity: root.solarForecastEntity
+        solarForecastDayEntities: root.solarForecastDayEntities
         buyPriceEntity: root.buyPriceEntity
         sellPriceEntity: root.sellPriceEntity
     }
@@ -237,6 +249,11 @@ Item {
             forecast: source.solarForecast
             actual: source.solarActual
             nowHour: source.hour
+            yesterdayActual: source.solarYesterday
+            yesterdayEnergy: source.solarYesterdayEnergy
+            yesterdayForecast: source.solarYesterdayForecast
+            today: source.midnight
+            week: source.solarWeek
             color: card.solarColor
         }
     }

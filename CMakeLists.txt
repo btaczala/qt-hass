@@ -143,6 +143,8 @@ qt_add_qml_module(
   qml/Energy/Details/EnergyStat.qml
   qml/Energy/Details/EnergyFormat.js
   qml/Energy/Details/SolarDetail.qml
+  qml/Energy/Details/SolarDay.qml
+  qml/Energy/Details/SolarWeek.qml
   qml/Energy/Details/GridDetail.qml
   qml/Energy/Details/BatteryDetail.qml
   qml/Energy/Details/HomeDetail.qml

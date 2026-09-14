@@ -8,7 +8,7 @@ import QtHomeAssistant
 // Home Assistant data for the energy page, in the shape EnergyFlowCard and the
 // detail overlays take: live readings in W/Wh (grid positive while importing,
 // battery positive while discharging), and chart series as [{x, y}] with x in
-// local hours -- since today's midnight for today's series, since the epoch
+// local hours -- since that day's midnight for a day's series, since the epoch
 // (`absoluteHour`) for the week of SoC history.
 //
 // Which entities to read is up to the user (see the list at the top of
@@ -42,9 +42,16 @@ Item {
     required property string gridImportTotalEntity
     required property string gridExportTotalEntity
     required property string homeEnergyTotalEntity
+    // Solar production's lifetime total, for production per day. Not the
+    // daily one (solarEnergyTodayEntity): its statistics' change is garbage
+    // across the midnight reset (negative days).
+    required property string solarEnergyTotalEntity
     // Solcast's forecast for today, read from its `detailedForecast`
-    // attribute.
+    // attribute; its state (the day's total) is also read from history for
+    // past days' forecasts, as the attribute isn't recorded.
     required property string solarForecastEntity
+    // Solcast's forecast totals for the following days, from tomorrow on.
+    required property var solarForecastDayEntities
     // Pstryk's current buy and sell price, read from their `All prices`
     // attribute; the unit (e.g. PLN/kWh) gives the currency.
     required property string buyPriceEntity
@@ -58,6 +65,9 @@ Item {
     readonly property real midnight: new Date(root.now).setHours(0, 0, 0, 0)
     readonly property real hour: (root.now - root.midnight) / 3600000
     readonly property real absoluteHour: root.absoluteHourOf(root.now)
+    readonly property real yesterday: root.daysAfter(root.midnight, -1)
+    // Midnight starting this week, per the locale's first day of the week.
+    readonly property real weekStart: root.daysAfter(root.midnight, -((new Date(root.midnight).getDay() - Qt.locale().firstDayOfWeek + 7) % 7))
 
     readonly property real solarPower: root.orZero(solar.baseValue)
     readonly property real gridPower: root.orZero(grid.baseValue)
@@ -119,6 +129,46 @@ Item {
                 x: root.absoluteHour,
                 y: root.batterySoc
             }])
+    // Yesterday's solar production: 5-minute averages ([{x: hour since
+    // yesterday's midnight, y: W}]), total (Wh) and Solcast's final forecast
+    // for it (Wh, NaN if unknown).
+    property var solarYesterday: []
+    readonly property real solarYesterdayEnergy: root.dailySolar[root.yesterday] ?? root.solarYesterday.reduce((sum, p) => sum + p.y * 5 / 60, 0)
+    readonly property real solarYesterdayForecast: root.dailyForecast[root.yesterday] ?? NaN
+    // This week, day by day: [{day: midnight in ms, energy: Wh produced (so
+    // far today, NaN for days ahead), forecast: Wh (NaN if unknown)}].
+    readonly property var solarWeek: {
+        const days = [];
+        for (let i = 0; i < 7; ++i) {
+            const day = root.daysAfter(root.weekStart, i);
+            let energy = NaN;
+            let forecast = NaN;
+            if (day < root.midnight) {
+                energy = root.dailySolar[day] ?? NaN;
+                forecast = root.dailyForecast[day] ?? NaN;
+            } else if (day === root.midnight) {
+                energy = root.solarEnergy;
+                forecast = root.forecastTotal;
+            } else {
+                const index = Math.round((day - root.midnight) / 86400000) - 1;
+                const ahead = index < forecastDays.count ? forecastDays.objectAt(index) as HassEntity : null;
+                forecast = ahead ? ahead.baseValue : NaN;
+            }
+            days.push({
+                day: day,
+                energy: energy,
+                forecast: forecast
+            });
+        }
+        return days;
+    }
+    // Today's forecast total (Wh).
+    readonly property real forecastTotal: forecast.baseValue
+    // Wh produced per local day (keyed by midnight in ms), and Solcast's last
+    // forecast for each, since the start of this week or yesterday.
+    property var dailySolar: ({})
+    property var dailyForecast: ({})
+
     // Average home consumption per hour of the day over the last week, in W.
     property var loadProfile: []
 
@@ -139,6 +189,14 @@ Item {
 
     function orZero(value: real): real {
         return isNaN(value) ? 0 : value;
+    }
+
+    // Midnight `days` days after the one at `day`; by date, not by 24 hours,
+    // so it holds across a DST change.
+    function daysAfter(day: real, days: int): real {
+        const d = new Date(day);
+        d.setDate(d.getDate() + days);
+        return d.getTime();
     }
 
     // Local hours since the epoch, so floor(x / 24) is a local calendar day.
@@ -224,6 +282,52 @@ Item {
         });
     }
 
+    // Yesterday's and this week's production and forecasts.
+    function refreshDays() {
+        const start = Math.min(root.yesterday, root.weekStart);
+        const midnight = root.midnight;
+        const yesterday = root.yesterday;
+        root.statistics([root.solarPowerEntity], yesterday, "5minute", ["mean"], result => {
+            root.solarYesterday = (result[root.solarPowerEntity] ?? []).filter(r => r.mean !== null && r.start < midnight).map(r => ({
+                        x: (r.start - yesterday) / 3600000 + 2.5 / 60,
+                        y: r.mean
+                    }));
+        });
+        root.statistics([root.solarEnergyTotalEntity], start, "hour", ["change"], result => {
+            const days = {};
+            for (const r of result[root.solarEnergyTotalEntity] ?? []) {
+                const day = new Date(r.start).setHours(0, 0, 0, 0);
+                days[day] = (days[day] ?? 0) + (r.change ?? 0);
+            }
+            root.dailySolar = days;
+        });
+        // The forecast sensor's state is the day's total, and moves to the
+        // next day's at midnight: a day's forecast is its last state that day.
+        // The first entry is the state at `start`, left over from the day
+        // before, so it's skipped.
+        HassAPI.command("history/history_during_period", {
+            start_time: new Date(start).toISOString(),
+            entity_ids: [root.solarForecastEntity],
+            minimal_response: true,
+            no_attributes: true,
+            significant_changes_only: false
+        }, root, (ok, json) => {
+            if (!ok)
+                return;
+            const unit = forecast.attributes.unit_of_measurement ?? "kWh";
+            const scale = unit.startsWith("k") ? 1000 : 1;
+            const days = {};
+            const entries = JSON.parse(json)[root.solarForecastEntity] ?? [];
+            for (let i = 1; i < entries.length; ++i) {
+                const value = Number(entries[i].s);
+                if (entries[i].s === "" || isNaN(value))
+                    continue;
+                days[new Date(entries[i].lu * 1000).setHours(0, 0, 0, 0)] = value * scale;
+            }
+            root.dailyForecast = days;
+        });
+    }
+
     function refreshWeek() {
         const weekAgo = root.now - 7 * 24 * 3600000;
         root.statistics([root.batterySocEntity], weekAgo, "hour", ["mean"], result => {
@@ -298,6 +402,15 @@ Item {
         id: forecast
         entityId: root.solarForecastEntity
     }
+    Instantiator {
+        id: forecastDays
+        model: root.solarForecastDayEntities
+
+        delegate: HassEntity {
+            required property var modelData
+            entityId: modelData
+        }
+    }
     HassEntity {
         id: buyPrice
         entityId: root.buyPriceEntity
@@ -325,13 +438,20 @@ Item {
         interval: 15 * 60000
         running: true
         repeat: true
-        onTriggered: root.refreshWeek()
+        onTriggered: {
+            root.refreshWeek();
+            root.refreshDays();
+        }
     }
-    // Today's series restart at midnight.
-    onMidnightChanged: root.refreshToday()
+    // Today's series restart at midnight, and today becomes yesterday.
+    onMidnightChanged: {
+        root.refreshToday();
+        root.refreshDays();
+    }
 
     Component.onCompleted: {
         root.refreshToday();
         root.refreshWeek();
+        root.refreshDays();
     }
 }
