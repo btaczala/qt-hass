@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -46,7 +48,83 @@ Item {
                 batterySoc: source.batterySoc
                 evPower: source.evPower
                 heatPumpPower: source.heatPumpPower
+
+                onDetailsRequested: node => {
+                    details.node = node;
+                    details.open();
+                }
             }
+        }
+    }
+
+    EnergyDetailPopup {
+        id: details
+
+        // "solar", "grid" or "battery", as sent by the card.
+        property string node
+
+        title: details.node === "solar" ? qsTr("Solar") : details.node === "grid" ? qsTr("Grid") : qsTr("Battery")
+        icon: details.node === "solar" ? "mdi:solar-power" : details.node === "grid" ? "mdi:transmission-tower" : card.batteryIcon(source.batterySoc, source.batteryPower < 0)
+        accent: details.node === "solar" ? card.solarColor : details.node === "grid" ? card.gridImportColor : card.batteryDischargeColor
+        content: details.node === "solar" ? solarDetails : details.node === "grid" ? gridDetails : batteryDetails
+    }
+
+    // Popups sit above the screensaver, so don't leave one open under it.
+    Connections {
+        target: Controler
+        function onScreensaverActiveChanged() {
+            if (Controler.screensaverActive)
+                details.close();
+        }
+    }
+
+    Component {
+        id: solarDetails
+
+        SolarDetail {
+            power: source.solarPower
+            producedEnergy: source.solarEnergy
+            forecast: source.solarForecast
+            actual: source.solarActual
+            nowHour: source.hour
+            color: card.solarColor
+        }
+    }
+
+    Component {
+        id: gridDetails
+
+        GridDetail {
+            power: source.gridPower
+            importPrices: source.importPrices
+            exportPrices: source.exportPrices
+            currency: source.currency
+            nowHour: source.hour
+            importedEnergy: source.importedEnergy
+            exportedEnergy: source.exportedEnergy
+            importCost: source.importCost
+            exportRevenue: source.exportRevenue
+            importColor: card.gridImportColor
+            exportColor: card.gridExportColor
+        }
+    }
+
+    Component {
+        id: batteryDetails
+
+        BatteryDetail {
+            soc: source.batterySoc
+            power: source.batteryPower
+            capacity: source.batteryCapacity
+            maxPower: source.batteryMaxPower
+            minSoc: source.batteryMinSoc
+            nowHour: source.hour
+            absoluteHour: source.absoluteHour
+            history: source.socHistory
+            solarForecast: source.solarForecast
+            loadProfile: source.loadProfile
+            chargeColor: card.batteryChargeColor
+            dischargeColor: card.batteryDischargeColor
         }
     }
 }

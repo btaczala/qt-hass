@@ -1,5 +1,5 @@
+#include <QApplication>
 #include <QDirIterator>
-#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickWindow>
@@ -11,7 +11,9 @@
 #include "remoteadmin.h"
 
 int main(int argc, char *argv[]) {
-  QGuiApplication app(argc, argv);
+  // QApplication rather than QGuiApplication: Qt Charts' QML types are built
+  // on Graphics View, which needs the widgets application object.
+  QApplication app(argc, argv);
   // Required for QSettings (Controler) and QtCore's Settings (Main.qml) to
   // share one persistent store.
   QCoreApplication::setOrganizationName("qt-hass");

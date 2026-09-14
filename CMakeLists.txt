@@ -9,11 +9,13 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_STANDARD 23)
 
+# Capped below 6.12: Qt Charts (energy detail overlays) is deprecated since
+# 6.10 and may be gone in 6.12, so a newer kit must fail here rather than at
+# the Charts component.
 find_package(
-  Qt6 6.7
-  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2 Network
+  Qt6 6.7...<6.12
+  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2 Network Widgets Charts
   REQUIRED
-  # Optional: without it MqttPublisher is left out of the build (see below).
   OPTIONAL_COMPONENTS Mqtt ShaderTools)
 
 if(QT_KNOWN_POLICY_QTP0002)
@@ -120,6 +122,14 @@ qt_add_qml_module(
   qml/Energy/EnergyFlowLine.qml
   qml/Energy/EnergyNode.qml
   qml/Energy/FakeEnergySource.qml
+  qml/Energy/Details/EnergyDetailPopup.qml
+  qml/Energy/Details/EnergyChartView.qml
+  qml/Energy/Details/EnergyValueAxis.qml
+  qml/Energy/Details/EnergyStat.qml
+  qml/Energy/Details/EnergyFormat.js
+  qml/Energy/Details/SolarDetail.qml
+  qml/Energy/Details/GridDetail.qml
+  qml/Energy/Details/BatteryDetail.qml
   qml/Settings/SettingsPage.qml
   qml/Settings/UiSettings.qml
   RESOURCES
@@ -149,7 +159,7 @@ set_target_properties(
 
 target_link_libraries(
   qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
-                          Qt6::QuickControls2 Qt6::Network)
+                          Qt6::QuickControls2 Qt6::Network Qt6::Widgets Qt6::Charts)
 
 # Plain QObjects, not QML types -- unlike hassapi.cpp/controller.cpp (which
 # are QML_SINGLETONs and belong in qt_add_qml_module's SOURCES above), the

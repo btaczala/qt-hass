@@ -34,6 +34,10 @@ Pane {
     // tapping home.
     property bool consumersVisible: false
 
+    // Tapping solar, grid or battery asks for that node's details; `node` is
+    // "solar", "grid" or "battery".
+    signal detailsRequested(string node)
+
     // power-flow-card-plus / HA energy dashboard default colors.
     property color solarColor: "#ff9800"
     property color gridImportColor: "#488fc2"
@@ -225,6 +229,8 @@ Pane {
                 label: qsTr("Solar")
                 icon: "mdi:solar-power"
                 color: root.solarColor
+                clickable: true
+                onClicked: root.detailsRequested("solar")
 
                 FlowValue {
                     watts: root.solarPower
@@ -239,6 +245,8 @@ Pane {
                 label: qsTr("Grid")
                 icon: "mdi:transmission-tower"
                 color: root.gridExport > root.gridImport ? root.gridExportColor : root.gridImportColor
+                clickable: true
+                onClicked: root.detailsRequested("grid")
 
                 FlowValue {
                     icon: "mdi:arrow-left"
@@ -331,6 +339,8 @@ Pane {
                 label: qsTr("Battery")
                 icon: root.batteryIcon(root.batterySoc, root.batteryCharge > 0)
                 color: root.batteryCharge > root.batteryDischarge ? root.batteryChargeColor : root.batteryDischargeColor
+                clickable: true
+                onClicked: root.detailsRequested("battery")
 
                 Label {
                     Layout.alignment: Qt.AlignHCenter
