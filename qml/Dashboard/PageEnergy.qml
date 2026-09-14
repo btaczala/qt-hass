@@ -127,14 +127,7 @@ Item {
     // Solar forecast (Solcast)
     readonly property string solarForecastEntity: "sensor.solcast_pv_forecast_prognoza_na_dzisiaj"
     // From tomorrow on.
-    readonly property var solarForecastDayEntities: [
-        "sensor.solcast_pv_forecast_prognoza_na_jutro",
-        "sensor.solcast_pv_forecast_prognoza_na_dzien_3",
-        "sensor.solcast_pv_forecast_prognoza_na_dzien_4",
-        "sensor.solcast_pv_forecast_prognoza_na_dzien_5",
-        "sensor.solcast_pv_forecast_prognoza_na_dzien_6",
-        "sensor.solcast_pv_forecast_prognoza_na_dzien_7"
-    ]
+    readonly property var solarForecastDayEntities: ["sensor.solcast_pv_forecast_prognoza_na_jutro", "sensor.solcast_pv_forecast_prognoza_na_dzien_3", "sensor.solcast_pv_forecast_prognoza_na_dzien_4", "sensor.solcast_pv_forecast_prognoza_na_dzien_5", "sensor.solcast_pv_forecast_prognoza_na_dzien_6", "sensor.solcast_pv_forecast_prognoza_na_dzien_7"]
 
     // Prices (Pstryk)
     readonly property string buyPriceEntity: "sensor.pstryk_current_buy_price"
@@ -166,48 +159,36 @@ Item {
         sellPriceEntity: root.sellPriceEntity
     }
 
-    ColumnLayout {
+    // The card sizes itself to its diagram; this area only decides the
+    // scale, the largest at which it fits.
+    Item {
+        id: cardArea
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 8
+        anchors.margins: 40
 
-        TabBar {
-            id: modeTabs
-            Layout.alignment: Qt.AlignHCenter
-            Layout.preferredWidth: 320
-            Material.background: "transparent"
+        EnergyFlowCard {
+            id: card
+            anchors.horizontalCenter: parent.horizontalCenter
+            diagramScale: Math.min((cardArea.width - card.leftPadding - card.rightPadding) / card.designWidth, (cardArea.height - card.topPadding - card.bottomPadding) / card.designHeight)
 
-            TabButton {
-                text: qsTr("Power now")
+            mode: powerButton.checked ? "energy" : "power"
+            solarPower: source.solarPower
+            gridPower: source.gridPower
+            batteryPower: source.batteryPower
+            batterySoc: source.batterySoc
+            energy: source.energyFlows
+
+            onDetailsRequested: node => {
+                details.node = node;
+                details.open();
             }
-            TabButton {
-                text: qsTr("Energy today")
-            }
-        }
-
-        // The card sizes itself to its diagram; this area only decides the
-        // scale, the largest at which it fits.
-        Item {
-            id: cardArea
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-
-            EnergyFlowCard {
-                id: card
-                anchors.horizontalCenter: parent.horizontalCenter
-                diagramScale: Math.min((cardArea.width - card.leftPadding - card.rightPadding) / card.designWidth,
-                                       (cardArea.height - card.topPadding - card.bottomPadding) / card.designHeight)
-
-                mode: modeTabs.currentIndex === 1 ? "energy" : "power"
-                solarPower: source.solarPower
-                gridPower: source.gridPower
-                batteryPower: source.batteryPower
-                batterySoc: source.batterySoc
-                energy: source.energyFlows
-
-                onDetailsRequested: node => {
-                    details.node = node;
-                    details.open();
+            Button {
+                id: powerButton
+                anchors.right: parent.right
+                checkable: true
+                MdiIcon {
+                    icon: powerButton.checked ? "mdi:power-plug-outline" : "mdi:solar-panel-large"
+                    anchors.centerIn: parent
                 }
             }
         }
