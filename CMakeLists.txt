@@ -123,6 +123,10 @@ qt_add_qml_module(
   qml/Dashboard/Dashboard.qml
   qml/Dashboard/PageOverview.qml
   qml/Dashboard/PageEnergy.qml
+  qml/Dashboard/PageCameras.qml
+  qml/Cameras/CameraCard.qml
+  qml/Cameras/CameraStreamPopup.qml
+  qml/Cameras/CameraUrls.js
   qml/Energy/EnergyFlowCard.qml
   qml/Energy/EnergyFlowLine.qml
   qml/Energy/EnergyNode.qml
