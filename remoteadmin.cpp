@@ -1,6 +1,7 @@
 #include "remoteadmin.h"
 #include "controller.h"
 
+#include <QtCore/QBuffer>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QSysInfo>
 #include <QtCore/QUrl>
@@ -44,6 +45,10 @@ void RemoteAdmin::start() {
                        << controler_->remoteAdminPort();
 }
 
+void RemoteAdmin::setScreenshotSource(std::function<QImage()> source) {
+  screenshot_source_ = std::move(source);
+}
+
 void RemoteAdmin::handleNewConnection() {
   while (server_.hasPendingConnections()) {
     QTcpSocket *socket = server_.nextPendingConnection();
@@ -57,6 +62,9 @@ void RemoteAdmin::handleNewConnection() {
       const auto end = buffer->indexOf("\r\n");
       if (end < 0)
         return; // wait for the rest of the request line
+      // Answer once: headers arriving in later packets would otherwise run
+      // the same request again.
+      QObject::disconnect(socket, &QTcpSocket::readyRead, this, nullptr);
       handleRequest(socket, buffer->left(end));
     });
     connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
@@ -82,6 +90,10 @@ void RemoteAdmin::handleRequest(QTcpSocket *socket, const QByteArray &requestLin
   }
 
   const QString cmd = query.queryItemValue("cmd");
+  if (cmd == "getScreenshot") {
+    handleScreenshot(socket);
+    return;
+  }
   if (!commands_.contains(cmd)) {
     writeResponse(socket, 400,
                   {{"status", "Error"}, {"statustext", "Unknown command"}});
@@ -93,16 +105,22 @@ void RemoteAdmin::handleRequest(QTcpSocket *socket, const QByteArray &requestLin
 
 void RemoteAdmin::writeResponse(QTcpSocket *socket, int statusCode,
                                 const QJsonObject &body) {
-  const QByteArray json = QJsonDocument{body}.toJson(QJsonDocument::Compact);
+  writeResponse(socket, statusCode, "application/json",
+                QJsonDocument{body}.toJson(QJsonDocument::Compact));
+}
+
+void RemoteAdmin::writeResponse(QTcpSocket *socket, int statusCode,
+                                const QByteArray &contentType,
+                                const QByteArray &body) {
   const QByteArray statusText = statusCode == 200   ? "OK"
                                  : statusCode == 401 ? "Unauthorized"
                                                       : "Bad Request";
   const QByteArray response = "HTTP/1.1 " + QByteArray::number(statusCode) + " " +
                               statusText + "\r\n" +
-                              "Content-Type: application/json\r\n" +
+                              "Content-Type: " + contentType + "\r\n" +
                               "Content-Length: " +
-                              QByteArray::number(json.size()) + "\r\n" +
-                              "Connection: close\r\n\r\n" + json;
+                              QByteArray::number(body.size()) + "\r\n" +
+                              "Connection: close\r\n\r\n" + body;
   socket->write(response);
   socket->disconnectFromHost();
 }
@@ -160,9 +178,20 @@ QJsonObject RemoteAdmin::cmdStopScreensaver(const QUrlQuery &) {
 
 // idleTimeoutSeconds is our own setting key, not a verified real Fully Kiosk
 // one -- see CLAUDE.md's remote admin section.
+// HA's fully_kiosk number platform only creates its "screensaver timer" entity
+// if listSettings has timeToScreensaverV2 (number.py: `if entity.key in
+// coordinator.data["settings"]`) and sets it via setStringSetting with that
+// key, so it's accepted as a synonym for this app's own idleTimeoutSeconds.
+// Same unit (seconds) and the same 0-means-never meaning.
+namespace {
+bool isIdleTimeoutKey(const QString &key) {
+  return key == "idleTimeoutSeconds" || key == "timeToScreensaverV2";
+}
+} // namespace
+
 QJsonObject RemoteAdmin::cmdGetStringSetting(const QUrlQuery &query) const {
   const QString key = query.queryItemValue("key");
-  if (key == "idleTimeoutSeconds")
+  if (isIdleTimeoutKey(key))
     return {{"status", "OK"},
             {"value", QString::number(controler_->idleTimeoutSeconds())}};
   return {{"status", "Error"}, {"statustext", "Unknown setting key"}};
@@ -195,6 +224,7 @@ QJsonObject RemoteAdmin::cmdListSettings(const QUrlQuery &) const {
   const bool mqttEnabled = false;
 #endif
   QJsonObject result{{"idleTimeoutSeconds", controler_->idleTimeoutSeconds()},
+                      {"timeToScreensaverV2", controler_->idleTimeoutSeconds()},
                       {"mqttEnabled", mqttEnabled}};
   if (mqttEnabled)
     result["mqttEventTopic"] = kMqttEventTopicTemplate;
@@ -203,15 +233,36 @@ QJsonObject RemoteAdmin::cmdListSettings(const QUrlQuery &) const {
 
 QJsonObject RemoteAdmin::cmdSetStringSetting(const QUrlQuery &query) {
   const QString key = query.queryItemValue("key");
-  if (key != "idleTimeoutSeconds")
+  if (!isIdleTimeoutKey(key))
     return {{"status", "Error"}, {"statustext", "Unknown setting key"}};
 
   bool ok = false;
   const int seconds = query.queryItemValue("value").toInt(&ok);
-  if (!ok || seconds <= 0)
+  if (!ok || seconds < 0)
     return {{"status", "Error"},
-            {"statustext", "value must be a positive integer"}};
+            {"statustext", "value must be a non-negative integer"}};
 
   controler_->setIdleTimeoutSeconds(seconds);
   return {{"status", "OK"}};
+}
+
+// HA's fully_kiosk image platform (image.py) creates its screenshot entity
+// unconditionally and fetches it through python-fullykiosk's getScreenshot(),
+// i.e. cmd=getScreenshot; the client returns the raw body as the image only
+// when the response's Content-Type is image/* (or application/octet-stream)
+// and otherwise parses JSON, where a {"status":"Error"} becomes a
+// FullyKioskError. HA serves the bytes as image/png.
+void RemoteAdmin::handleScreenshot(QTcpSocket *socket) {
+  const QImage image = screenshot_source_ ? screenshot_source_() : QImage{};
+  if (image.isNull()) {
+    writeResponse(socket, 200,
+                  {{"status", "Error"}, {"statustext", "Screenshot not available"}});
+    return;
+  }
+
+  QByteArray png;
+  QBuffer buffer(&png);
+  buffer.open(QIODevice::WriteOnly);
+  image.save(&buffer, "PNG");
+  writeResponse(socket, 200, "image/png", png);
 }

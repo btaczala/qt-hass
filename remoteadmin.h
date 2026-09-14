@@ -4,6 +4,7 @@
 #include <QtCore/QJsonObject>
 #include <QtCore/QObject>
 #include <QtCore/QUrlQuery>
+#include <QtGui/QImage>
 #include <QtNetwork/QTcpServer>
 
 #include <functional>
@@ -27,10 +28,19 @@ public:
 
   void start();
 
+  // Where getScreenshot gets its image from -- main.cpp hands in a grab of
+  // the app window. Without one, getScreenshot answers with an error.
+  void setScreenshotSource(std::function<QImage()> source);
+
 private:
   void handleNewConnection();
   void handleRequest(QTcpSocket *socket, const QByteArray &requestLine);
   void writeResponse(QTcpSocket *socket, int statusCode, const QJsonObject &body);
+  void writeResponse(QTcpSocket *socket, int statusCode,
+                     const QByteArray &contentType, const QByteArray &body);
+
+  // Binary, unlike the JSON commands in commands_ -- see remoteadmin.cpp.
+  void handleScreenshot(QTcpSocket *socket);
 
   QJsonObject cmdDeviceInfo(const QUrlQuery &query) const;
   QJsonObject cmdStartScreensaver(const QUrlQuery &query);
@@ -42,6 +52,7 @@ private:
   QTcpServer server_;
   Controler *controler_;
   QMap<QString, std::function<QJsonObject(const QUrlQuery &)>> commands_;
+  std::function<QImage()> screenshot_source_;
 };
 
 #endif // REMOTEADMIN_H

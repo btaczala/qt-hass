@@ -244,11 +244,14 @@ Page {
                 }
 
                 SpinBox {
-                    from: 10
+                    // 0 turns the screensaver off.
+                    from: 0
                     to: 3600
                     stepSize: 10
                     editable: true
                     value: Controler.idleTimeoutSeconds
+                    textFromValue: (value, locale) => value === 0 ? qsTr("Never") : Number(value).toLocaleString(locale, "f", 0)
+                    valueFromText: (text, locale) => text === qsTr("Never") ? 0 : Number.fromLocaleString(locale, text)
                     onValueModified: Controler.idleTimeoutSeconds = value
                 }
             }

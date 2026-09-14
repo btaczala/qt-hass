@@ -28,7 +28,7 @@ class Controler : public QObject {
                  hassTokenChanged)
   Q_PROPERTY(bool screensaverActive READ screensaverActive WRITE
                  setScreensaverActive NOTIFY screensaverActiveChanged);
-  // Seconds without user input before the screensaver starts.
+  // Seconds without user input before the screensaver starts; 0 means never.
   Q_PROPERTY(int idleTimeoutSeconds READ idleTimeoutSeconds WRITE
                  setIdleTimeoutSeconds NOTIFY idleTimeoutSecondsChanged);
   Q_PROPERTY(bool hassConnected READ hassConnected WRITE setHassConnected
@@ -70,7 +70,8 @@ public:
   void setScreensaverActive(bool active);
 
   // Defaults to the bundled IDLE_TIMEOUT_SECONDS (or 60); changes from the
-  // settings page or RemoteAdmin are saved to QSettings.
+  // settings page or RemoteAdmin are saved to QSettings. 0 disables the
+  // screensaver, matching Fully Kiosk's timeToScreensaverV2.
   int idleTimeoutSeconds() const noexcept { return idle_timeout_seconds_; }
   void setIdleTimeoutSeconds(int seconds);
 

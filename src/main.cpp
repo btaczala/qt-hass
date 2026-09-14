@@ -2,6 +2,7 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickWindow>
 
 #include "controller.h"
 #ifdef QTHASS_HAS_MQTT
@@ -45,6 +46,8 @@ int main(int argc, char *argv[]) {
   engine.rootObjects().at(0)->installEventFilter(controler);
 
   RemoteAdmin remoteAdmin(controler);
+  if (auto *window = qobject_cast<QQuickWindow *>(engine.rootObjects().at(0)))
+    remoteAdmin.setScreenshotSource([window] { return window->grabWindow(); });
   remoteAdmin.start();
 
 #ifdef QTHASS_HAS_MQTT

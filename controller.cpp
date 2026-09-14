@@ -42,8 +42,9 @@ Controler::Controler(QObject *parent)
   connect(&is_idle_timer_, &QTimer::timeout, this,
           [this]() { setScreensaverActive(true); });
 
-  is_idle_timer_.start();
   is_idle_timer_.setSingleShot(true);
+  if (idle_timeout_seconds_ > 0)
+    is_idle_timer_.start();
 
   loadConnection();
   loadMqttConfig();
@@ -169,7 +170,7 @@ void Controler::setScreensaverActive(bool active) {
   // Any explicit "off" -- whether from local interaction or a remote
   // stopScreensaver command -- rearms the countdown, since is_idle_timer_ is
   // single-shot and would otherwise never fire again.
-  if (!active)
+  if (!active && idle_timeout_seconds_ > 0)
     is_idle_timer_.start();
 }
 
@@ -181,13 +182,17 @@ void Controler::setHassConnected(bool connected) {
 }
 
 void Controler::setIdleTimeoutSeconds(int seconds) {
-  if (seconds <= 0 || seconds == idle_timeout_seconds_)
+  if (seconds < 0 || seconds == idle_timeout_seconds_)
     return;
   idle_timeout_seconds_ = seconds;
-  is_idle_timer_.setInterval(std::chrono::seconds(seconds));
-  // The new timeout counts from now, unless the screensaver is already up.
-  if (!screensaver_active_)
-    is_idle_timer_.start();
+  if (seconds == 0) {
+    is_idle_timer_.stop();
+  } else {
+    is_idle_timer_.setInterval(std::chrono::seconds(seconds));
+    // The new timeout counts from now, unless the screensaver is already up.
+    if (!screensaver_active_)
+      is_idle_timer_.start();
+  }
   QSettings{}.setValue(kIdleTimeoutKey, seconds);
   Q_EMIT idleTimeoutSecondsChanged();
 }
