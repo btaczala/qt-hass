@@ -20,13 +20,15 @@ android-image variant:
     # Qt/NDK version is bumped -- not on every app source edit, since the app
     # itself is bind-mounted in at build time, not baked into the image.
     case "{{ variant }}" in
-      qt67)  qt=6.7.3;  ndk=26.1.10909125 ;;
-      qt610) qt=6.10.1; ndk=27.3.13750724 ;;
+      qt67)  qt=6.7.3;  ndk=26.1.10909125; platform=android-34; build_tools=34.0.0 ;;
+      qt610) qt=6.10.1; ndk=27.3.13750724; platform=android-36; build_tools=35.0.0 ;;
       *) echo "variant must be qt67 or qt610, got '{{ variant }}'" >&2; exit 1 ;;
     esac
     docker build --platform linux/amd64 -f docker/android.Dockerfile \
       --build-arg QT_VERSION="$qt" \
       --build-arg NDK_VERSION="$ndk" \
+      --build-arg ANDROID_PLATFORM="$platform" \
+      --build-arg BUILD_TOOLS_VERSION="$build_tools" \
       -t {{ image_tag }}:{{ variant }} \
       docker
 

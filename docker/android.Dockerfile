@@ -20,6 +20,10 @@ FROM --platform=linux/amd64 ubuntu:24.04
 
 ARG QT_VERSION=6.10.1
 ARG NDK_VERSION=27.3.13750724
+# SDK platform and build-tools, also per Qt version (paired in the justfile):
+# see the sdkmanager step below for why they can't be one fixed pair.
+ARG ANDROID_PLATFORM=android-36
+ARG BUILD_TOOLS_VERSION=35.0.0
 # qtcharts/qtmultimedia/qtwebsockets are required components (see
 # CMakeLists.txt's find_package(Qt6 ... COMPONENTS ... Charts)); qtshadertools
 # is optional (AnimatedBackground's dithered gradient, see CLAUDE.md) but
@@ -63,16 +67,19 @@ RUN mkdir -p "${ANDROID_SDK_ROOT}/cmdline-tools" \
   && mv /tmp/cmdline-tools/cmdline-tools "${ANDROID_SDK_ROOT}/cmdline-tools/latest" \
   && rm -rf /tmp/cmdline-tools /tmp/cmdline-tools.zip
 
-# platforms;android-34 only (not 36): matches the isolated SDK root the host
-# build uses for its qt67 kit (see CLAUDE.md) to dodge AGP 7.4.1's aapt2
-# failing to parse the android-36 platform jar. Since this image never
-# installs android-36 at all, both qt67 and qt610 get that safety for free
-# without needing the host's separate sdk-compat-api34 symlink farm.
+# Exactly one SDK platform per image, since androiddeployqt compiles against
+# the highest one installed. qt67 gets android-34 only: matches the isolated
+# SDK root the host build uses for that kit (see CLAUDE.md) to dodge AGP
+# 7.4.1's aapt2 failing to parse the android-36 platform jar, without needing
+# the host's separate sdk-compat-api34 symlink farm. qt610 can't use 34: its
+# Gradle template pulls androidx.core 1.16.0, which fails checkDebugAarMetadata
+# below compileSdk 35 -- it gets android-36 (like the host qt610 build), which
+# its AGP 8.10.1 parses fine, plus the build-tools 35 that AGP requires.
 RUN yes | sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" --licenses >/dev/null \
   && sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" \
        "platform-tools" \
-       "platforms;android-34" \
-       "build-tools;34.0.0" \
+       "platforms;${ANDROID_PLATFORM}" \
+       "build-tools;${BUILD_TOOLS_VERSION}" \
        "ndk;${NDK_VERSION}"
 
 ENV ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/${NDK_VERSION}"
