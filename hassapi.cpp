@@ -2,6 +2,7 @@
 #include "controller.h"
 #include <QLoggingCategory>
 #include <QSslError>
+#include <QTimer>
 #include <QWebSocket>
 
 #include <QJsonArray>
@@ -13,7 +14,13 @@ Q_DECLARE_LOGGING_CATEGORY(hassAPI)
 
 Q_LOGGING_CATEGORY(hassAPI, "qthass.api")
 
+using namespace std::chrono_literals;
+
 namespace {
+constexpr auto kRetryInterval = 5s;
+constexpr auto kConnectTimeout = 20s;
+constexpr auto kPingInterval = 30s;
+
 QUrl defaultUrl() { return QUrl{Controler::create(nullptr, nullptr)->hassUrl()}; }
 QString defaultAccessToken() {
   return Controler::create(nullptr, nullptr)->hassToken();
@@ -22,8 +29,22 @@ QString defaultAccessToken() {
 
 HassAPI::HassAPI(QObject *parent)
     : QObject(parent), socket_(new QWebSocket{}), url_(defaultUrl()),
-      connected_(false) {
+      connected_(false), retry_timer_(new QTimer{this}),
+      connect_timeout_(new QTimer{this}), ping_timer_(new QTimer{this}) {
   socket_->setParent(this);
+
+  retry_timer_->setSingleShot(true);
+  retry_timer_->setInterval(kRetryInterval);
+  QObject::connect(retry_timer_, &QTimer::timeout, this, &HassAPI::connect);
+
+  connect_timeout_->setSingleShot(true);
+  connect_timeout_->setInterval(kConnectTimeout);
+  QObject::connect(connect_timeout_, &QTimer::timeout, this, [this]() {
+    dropConnection("connection attempt timed out");
+  });
+
+  ping_timer_->setInterval(kPingInterval);
+  QObject::connect(ping_timer_, &QTimer::timeout, this, &HassAPI::sendPing);
 
   message_handlers_["auth_required"] = [this](QJsonDocument payload) {
     QJsonDocument resp_doc;
@@ -37,6 +58,9 @@ HassAPI::HassAPI(QObject *parent)
 
   message_handlers_["auth_ok"] = [this](QJsonDocument payload) {
     qCInfo(hassAPI) << "Connected to " << url_;
+    connect_timeout_->stop();
+    awaiting_pong_ = false;
+    ping_timer_->start();
     connected_ = true;
     // QML components created in response to this may call
     // registerStateChanges(), which subscribes on its own now that
@@ -48,6 +72,15 @@ HassAPI::HassAPI(QObject *parent)
     for (const QString &entity_id : state_changed_entity_handlers_.keys())
       subscribeToEntity(entity_id);
   };
+
+  // HA closes the socket itself after this, which schedules a retry; the
+  // token may just not be valid yet (e.g. still being set up), so keep trying.
+  message_handlers_["auth_invalid"] = [this](QJsonDocument payload) {
+    qCCritical(hassAPI) << "Authentication rejected by" << url_ << ":"
+                        << payload["message"].toString();
+  };
+
+  message_handlers_["pong"] = [this](QJsonDocument) { awaiting_pong_ = false; };
 
   message_handlers_["result"] = [this](QJsonDocument payload) {
     if (!payload["success"].toBool(true))
@@ -64,10 +97,7 @@ HassAPI::HassAPI(QObject *parent)
                    });
 
   QObject::connect(socket_, &QWebSocket::disconnected, [this]() {
-    connected_ = false;
-    subscribed_entities_.clear();
-    entity_states_.clear();
-    emit connectedChanged();
+    resetSession();
 
     // closeCode() is only meaningful once a WebSocket connection actually
     // existed; on a failed connect it still reads as a clean 1000, which
@@ -82,6 +112,7 @@ HassAPI::HassAPI(QObject *parent)
                           << "- check that the host is reachable and the"
                              " scheme matches (wss for TLS, ws for plain)";
     }
+    scheduleRetry();
   });
 
   QObject::connect(socket_, &QWebSocket::errorOccurred,
@@ -116,7 +147,14 @@ HassAPI::HassAPI(QObject *parent)
 }
 
 void HassAPI::connect() {
+  keep_connected_ = true;
+  retry_timer_->stop();
+  if (socket_->state() != QAbstractSocket::UnconnectedState)
+    return;
+  // Re-read on every attempt, so a retry picks up settings changed meanwhile.
+  url_ = defaultUrl();
   qCDebug(hassAPI) << "Connecting to " << url_;
+  connect_timeout_->start();
   socket_->open(url_);
 }
 
@@ -124,14 +162,51 @@ void HassAPI::reconnect() {
   socket_->abort();
   // abort() only emits disconnected() for a socket that had actually
   // connected, so don't rely on that handler to reset the session state.
+  resetSession();
+  connect();
+}
+
+void HassAPI::resetSession() {
+  connect_timeout_->stop();
+  ping_timer_->stop();
+  awaiting_pong_ = false;
+  subscribed_entities_.clear();
+  entity_states_.clear();
   if (connected_) {
     connected_ = false;
-    subscribed_entities_.clear();
-    entity_states_.clear();
     emit connectedChanged();
   }
-  url_ = defaultUrl();
-  connect();
+}
+
+void HassAPI::dropConnection(const char *reason) {
+  qCWarning(hassAPI) << "Dropping connection to" << url_ << "-" << reason;
+  socket_->abort();
+  // As in reconnect(): disconnected() may or may not have run by now.
+  resetSession();
+  scheduleRetry();
+}
+
+void HassAPI::scheduleRetry() {
+  if (!keep_connected_ || retry_timer_->isActive())
+    return;
+  qCInfo(hassAPI) << "Retrying in"
+                  << std::chrono::duration_cast<std::chrono::seconds>(
+                         kRetryInterval)
+                         .count()
+                  << "s";
+  retry_timer_->start();
+}
+
+void HassAPI::sendPing() {
+  if (awaiting_pong_) {
+    dropConnection("no pong from the last ping");
+    return;
+  }
+  awaiting_pong_ = true;
+  QJsonObject request;
+  request["id"] = request_id++;
+  request["type"] = QLatin1StringView{"ping"};
+  socket_->sendTextMessage(QJsonDocument{request}.toJson());
 }
 
 void HassAPI::registerStateChanges(QString entity_id, QJSValue fn) {
