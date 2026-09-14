@@ -30,5 +30,20 @@ Flickable {
             Layout.preferredHeight: 220
             entity_id: "camera.g3_flex_high_resolution_channel"
         }
+        CameraCard {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 220
+            entity_id: "camera.g5_bullet_high"
+        }
+        CameraCard {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 220
+            entity_id: "camera.g5_turret_ultra_high_resolution_channel"
+        }
+        CameraCard {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 220
+            entity_id: "camera.g5_turret_ultra_high_resolution_channel_2"
+        }
     }
 }
