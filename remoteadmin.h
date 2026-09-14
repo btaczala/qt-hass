@@ -39,9 +39,6 @@ private:
   QJsonObject cmdSetStringSetting(const QUrlQuery &query);
   QJsonObject cmdListSettings(const QUrlQuery &query) const;
 
-  // This device's own LAN IPv4 address, for deviceInfo's "ip4" field.
-  QString deviceIp() const;
-
   QTcpServer server_;
   Controler *controler_;
   QMap<QString, std::function<QJsonObject(const QUrlQuery &)>> commands_;

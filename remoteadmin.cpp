@@ -126,19 +126,16 @@ void RemoteAdmin::writeResponse(QTcpSocket *socket, int statusCode,
 // rather than faked -- this is still not a full drop-in.
 QJsonObject RemoteAdmin::cmdDeviceInfo(const QUrlQuery &) const {
   const QString mac = controler_->deviceId();
-  QString name = QSysInfo::machineHostName();
-  if (name.isEmpty())
-    name = QStringLiteral("qthomeassistant");
 
   return {
       {"status", "OK"},
       {"deviceID", mac},
-      {"deviceName", name},
+      {"deviceName", controler_->deviceName()},
       {"deviceManufacturer", QStringLiteral("qthomeassistant")},
       {"deviceModel", QSysInfo::prettyProductName()},
       {"appVersionName", QStringLiteral(APP_VERSION)},
       {"Mac", mac},
-      {"ip4", deviceIp()},
+      {"ip4", controler_->deviceIp()},
       {"screensaverActive", controler_->screensaverActive()},
       // switch.py's "screensaver" entity reads its on/off state from this
       // exact key (is_on_fn=lambda data: data.get("isInScreensaver")) --
@@ -149,14 +146,6 @@ QJsonObject RemoteAdmin::cmdDeviceInfo(const QUrlQuery &) const {
       {"idleTimeoutSeconds", controler_->idleTimeoutSeconds()},
       {"hassConnected", controler_->hassConnected()},
   };
-}
-
-QString RemoteAdmin::deviceIp() const {
-  for (const QHostAddress &address : QNetworkInterface::allAddresses()) {
-    if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback())
-      return address.toString();
-  }
-  return QStringLiteral("127.0.0.1");
 }
 
 QJsonObject RemoteAdmin::cmdStartScreensaver(const QUrlQuery &) {
@@ -199,7 +188,12 @@ QJsonObject RemoteAdmin::cmdGetStringSetting(const QUrlQuery &query) const {
 // events this exists for. No "status" wrapper: the coordinator merges this
 // object as-is under deviceInfo's "settings" key.
 QJsonObject RemoteAdmin::cmdListSettings(const QUrlQuery &) const {
+#ifdef QTHASS_HAS_MQTT
   const bool mqttEnabled = !controler_->mqttBrokerHost().isEmpty();
+#else
+  // Built without Qt MQTT, so nothing would ever publish these events.
+  const bool mqttEnabled = false;
+#endif
   QJsonObject result{{"idleTimeoutSeconds", controler_->idleTimeoutSeconds()},
                       {"mqttEnabled", mqttEnabled}};
   if (mqttEnabled)

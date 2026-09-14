@@ -14,10 +14,19 @@ Page {
 
     required property UiSettings settings
 
-    // Refills the connection fields from Controler, discarding unsaved edits.
+    // Read by the About section; refreshed by reset().
+    property var systemInfo: ({})
+
+    // Refills the connection and MQTT fields from Controler, discarding
+    // unsaved edits, and refreshes the About section.
     function reset() {
+        root.systemInfo = Controler.systemInfo();
         urlField.text = Controler.hassUrl;
         tokenField.text = Controler.hassToken;
+        mqttHostField.text = Controler.mqttBrokerHost;
+        mqttPortField.text = Controler.mqttBrokerPort;
+        mqttUsernameField.text = Controler.mqttUsername;
+        mqttPasswordField.text = Controler.mqttPassword;
     }
 
     padding: 16
@@ -35,6 +44,16 @@ Page {
         Layout.topMargin: 16
         font.bold: true
         color: Material.accentColor
+    }
+
+    // A name/value row of the About section.
+    component InfoLabel: Label {
+        Layout.alignment: Qt.AlignTop
+        color: Material.hintTextColor
+    }
+    component InfoValue: Label {
+        Layout.fillWidth: true
+        wrapMode: Text.WrapAnywhere
     }
 
     ScrollView {
@@ -98,6 +117,88 @@ Page {
             }
 
             SectionLabel {
+                text: qsTr("MQTT")
+            }
+
+            Label {
+                Layout.fillWidth: true
+                visible: !Controler.mqttSupported
+                text: qsTr("This build has no MQTT support.")
+                wrapMode: Text.WordWrap
+                color: root.Material.hintTextColor
+            }
+
+            // Publishes screensaver state for Home Assistant's fully_kiosk
+            // integration; an empty host turns it off.
+            ColumnLayout {
+                Layout.fillWidth: true
+                enabled: Controler.mqttSupported
+                spacing: 8
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    TextField {
+                        id: mqttHostField
+                        Layout.fillWidth: true
+                        placeholderText: qsTr("Broker host (empty to disable)")
+                        inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+                    }
+
+                    TextField {
+                        id: mqttPortField
+                        Layout.preferredWidth: 80
+                        placeholderText: qsTr("Port")
+                        inputMethodHints: Qt.ImhDigitsOnly
+                        validator: IntValidator {
+                            bottom: 1
+                            top: 65535
+                        }
+                    }
+                }
+
+                TextField {
+                    id: mqttUsernameField
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Username (optional)")
+                    inputMethodHints: Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+                }
+
+                TextField {
+                    id: mqttPasswordField
+                    Layout.fillWidth: true
+                    placeholderText: qsTr("Password (optional)")
+                    echoMode: TextInput.Password
+                    inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: Controler.mqttBrokerHost === "" ? qsTr("Disabled") : Controler.mqttConnected ? qsTr("Connected") : qsTr("Not connected")
+                        color: root.Material.hintTextColor
+                    }
+
+                    Button {
+                        text: qsTr("Use built-in")
+                        flat: true
+                        onClicked: {
+                            Controler.clearSavedMqttConfig();
+                            root.reset();
+                        }
+                    }
+
+                    Button {
+                        text: qsTr("Save and reconnect")
+                        highlighted: true
+                        onClicked: Controler.setMqttConfig(mqttHostField.text.trim(), parseInt(mqttPortField.text) || 1883, mqttUsernameField.text.trim(), mqttPasswordField.text)
+                    }
+                }
+            }
+
+            SectionLabel {
                 text: qsTr("Appearance")
             }
 
@@ -149,6 +250,67 @@ Page {
                     editable: true
                     value: Controler.idleTimeoutSeconds
                     onValueModified: Controler.idleTimeoutSeconds = value
+                }
+            }
+
+            SectionLabel {
+                text: qsTr("About")
+            }
+
+            GridLayout {
+                Layout.fillWidth: true
+                Layout.bottomMargin: 16
+                columns: 2
+                columnSpacing: 16
+                rowSpacing: 6
+
+                InfoLabel {
+                    text: qsTr("Name")
+                }
+                InfoValue {
+                    text: root.systemInfo.name ?? ""
+                }
+
+                InfoLabel {
+                    text: qsTr("IP address")
+                }
+                InfoValue {
+                    text: (root.systemInfo.ipAddresses ?? []).join("\n") || qsTr("None")
+                }
+
+                InfoLabel {
+                    text: qsTr("MAC address")
+                }
+                InfoValue {
+                    text: root.systemInfo.mac ?? ""
+                }
+
+                InfoLabel {
+                    text: qsTr("Remote admin")
+                }
+                InfoValue {
+                    text: root.systemInfo.remoteAdminEnabled ? qsTr("Port %1").arg(root.systemInfo.remoteAdminPort) : qsTr("Disabled")
+                }
+
+                InfoLabel {
+                    text: qsTr("App version")
+                }
+                InfoValue {
+                    text: root.systemInfo.appVersion ?? ""
+                }
+
+                InfoLabel {
+                    text: qsTr("System")
+                }
+                InfoValue {
+                    text: root.systemInfo.system ?? ""
+                }
+
+                InfoLabel {
+                    text: qsTr("Qt version")
+                }
+                InfoValue {
+                    text: root.systemInfo.qtVersion ?? ""
                 }
             }
         }

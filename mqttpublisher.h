@@ -14,7 +14,8 @@ class Controler;
 // (and any other fully_kiosk entity relying on the same mechanism) updates
 // immediately instead of waiting for the integration's 30s deviceInfo/
 // listSettings poll. Only connects if Controler::mqttBrokerHost() is
-// non-empty, same gating pattern as RemoteAdmin's password check.
+// non-empty, same gating pattern as RemoteAdmin's password check, and
+// reconnects whenever Controler's MQTT config changes.
 class MqttPublisher : public QObject {
   Q_OBJECT
 
@@ -24,10 +25,15 @@ public:
   void start();
 
 private:
+  // Drops the current connection, if any, and starts again with the current
+  // config.
+  void restart();
   void publishScreensaverState(bool active);
 
   Controler *controler_;
-  QMqttClient client_;
+  // A fresh client per start(): reusing one across a config change lets the
+  // old connection's asynchronous close tear down the new connection attempt.
+  QMqttClient *client_{nullptr};
   QTimer reconnect_timer_;
 };
 

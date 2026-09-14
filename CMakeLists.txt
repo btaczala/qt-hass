@@ -11,8 +11,10 @@ set(CMAKE_CXX_STANDARD 23)
 
 find_package(
   Qt6 6.7
-  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2 Network Mqtt
-  REQUIRED)
+  COMPONENTS Gui Quick Multimedia WebSockets QuickControls2 Network
+  REQUIRED
+  # Optional: without it MqttPublisher is left out of the build (see below).
+  OPTIONAL_COMPONENTS Mqtt)
 
 if(QT_KNOWN_POLICY_QTP0002)
   qt_policy(SET QTP0002 NEW)
@@ -51,12 +53,6 @@ endif()
 
 message(STATUS "MDI icons: ${MDI_OUTPUT}")
 
-# App config (HASS_URL/HASS_TOKEN, plus the optional IDLE_TIMEOUT_SECONDS,
-# REMOTE_ADMIN_* and MQTT_* keys) is bundled into the binary as
-# :/qt-hass/config, generated at configure time from .envrc and/or a repo-root
-# `config` file (edit either, rebuild). Deliberately simple until there's a
-# real story for how others customize a build; it lands in the build directory
-# only, since it holds the real token and passwords.
 set(CONFIG_GENERATOR ${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_config.py)
 set(ENVRC ${CMAKE_CURRENT_SOURCE_DIR}/.envrc)
 set(CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/config)
@@ -152,13 +148,24 @@ set_target_properties(
 
 target_link_libraries(
   qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
-                          Qt6::QuickControls2 Qt6::Network Qt6::Mqtt)
+                          Qt6::QuickControls2 Qt6::Network)
 
 # Plain QObjects, not QML types -- unlike hassapi.cpp/controller.cpp (which
 # are QML_SINGLETONs and belong in qt_add_qml_module's SOURCES above), the
 # remote admin server and MQTT publisher have no QML surface.
-target_sources(qthomeassistant PRIVATE remoteadmin.h remoteadmin.cpp
-                                       mqttpublisher.h mqttpublisher.cpp)
+target_sources(qthomeassistant PRIVATE remoteadmin.h remoteadmin.cpp)
+
+# Qt MQTT has no prebuilt package for this project's kits and has to be built
+# from source (see CLAUDE.md), so it's optional: without it the app builds
+# without MqttPublisher, and RemoteAdmin reports MQTT as disabled.
+if(TARGET Qt6::Mqtt)
+  target_sources(qthomeassistant PRIVATE mqttpublisher.h mqttpublisher.cpp)
+  target_link_libraries(qthomeassistant PRIVATE Qt6::Mqtt)
+  target_compile_definitions(qthomeassistant PRIVATE QTHASS_HAS_MQTT)
+  message(STATUS "Qt MQTT found: MQTT publishing enabled")
+else()
+  message(STATUS "Qt MQTT not found: building without MQTT publishing")
+endif()
 
 # qt_add_qml_module's generated type registration includes headers by basename,
 # so src/ has to be reachable the same way the root-level headers are.

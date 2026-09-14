@@ -6,6 +6,7 @@
 #include <QtCore/qloggingcategory.h>
 
 #include <chrono>
+#include <utility>
 
 Q_LOGGING_CATEGORY(mqttPublisher, "qthass.mqtt")
 
@@ -21,16 +22,12 @@ MqttPublisher::MqttPublisher(Controler *controler, QObject *parent)
   reconnect_timer_.setInterval(
       std::chrono::duration_cast<std::chrono::milliseconds>(kReconnectInterval)
           .count());
-  connect(&reconnect_timer_, &QTimer::timeout, &client_,
-          [this]() { client_.connectToHost(); });
-
-  connect(&client_, &QMqttClient::connected, this,
-          [this]() { qCInfo(mqttPublisher) << "Connected to" << client_.hostname(); });
-  connect(&client_, &QMqttClient::disconnected, this, [this]() {
-    qCWarning(mqttPublisher) << "Disconnected from broker, retrying in"
-                              << kReconnectInterval.count() << "s";
-    reconnect_timer_.start();
+  connect(&reconnect_timer_, &QTimer::timeout, this, [this]() {
+    if (client_ && client_->state() == QMqttClient::Disconnected)
+      client_->connectToHost();
   });
+
+  connect(controler_, &Controler::mqttConfigChanged, this, &MqttPublisher::restart);
 
   connect(controler_, &Controler::screensaverActiveChanged, this, [this]() {
     publishScreensaverState(controler_->screensaverActive());
@@ -39,26 +36,53 @@ MqttPublisher::MqttPublisher(Controler *controler, QObject *parent)
 
 void MqttPublisher::start() {
   if (controler_->mqttBrokerHost().isEmpty()) {
-    qCInfo(mqttPublisher) << "MQTT_BROKER_HOST not set in config -- "
+    qCInfo(mqttPublisher) << "No MQTT broker host configured -- "
                              "screensaver state won't be published over MQTT";
     return;
   }
 
-  client_.setHostname(controler_->mqttBrokerHost());
-  client_.setPort(controler_->mqttBrokerPort());
+  client_ = new QMqttClient(this);
+  connect(client_, &QMqttClient::connected, this,
+          [this]() { qCInfo(mqttPublisher) << "Connected to" << client_->hostname(); });
+  connect(client_, &QMqttClient::disconnected, this, [this]() {
+    qCWarning(mqttPublisher) << "Disconnected from broker, retrying in"
+                              << kReconnectInterval.count() << "s";
+    reconnect_timer_.start();
+  });
+  connect(client_, &QMqttClient::stateChanged, this,
+          [this](QMqttClient::ClientState state) {
+            controler_->setMqttConnected(state == QMqttClient::Connected);
+          });
+
+  client_->setHostname(controler_->mqttBrokerHost());
+  client_->setPort(controler_->mqttBrokerPort());
   if (!controler_->mqttUsername().isEmpty())
-    client_.setUsername(controler_->mqttUsername());
+    client_->setUsername(controler_->mqttUsername());
   if (!controler_->mqttPassword().isEmpty())
-    client_.setPassword(controler_->mqttPassword());
-  client_.setClientId(QStringLiteral("qthomeassistant-") + controler_->deviceId());
+    client_->setPassword(controler_->mqttPassword());
+  client_->setClientId(QStringLiteral("qthomeassistant-") + controler_->deviceId());
 
   qCInfo(mqttPublisher) << "Connecting to" << controler_->mqttBrokerHost() << ":"
                         << controler_->mqttBrokerPort();
-  client_.connectToHost();
+  client_->connectToHost();
+}
+
+void MqttPublisher::restart() {
+  reconnect_timer_.stop();
+  if (client_) {
+    // Detach first, so the old client's disconnect doesn't schedule a retry
+    // or report a stale state.
+    QMqttClient *old = std::exchange(client_, nullptr);
+    old->disconnect(this);
+    old->disconnectFromHost();
+    old->deleteLater();
+    controler_->setMqttConnected(false);
+  }
+  start();
 }
 
 void MqttPublisher::publishScreensaverState(bool active) {
-  if (client_.state() != QMqttClient::Connected) {
+  if (!client_ || client_->state() != QMqttClient::Connected) {
     qCWarning(mqttPublisher) << "Not connected -- dropping screensaver state publish";
     return;
   }
@@ -73,5 +97,5 @@ void MqttPublisher::publishScreensaverState(bool active) {
       QJsonDocument{QJsonObject{{"event", eventName}}}.toJson(QJsonDocument::Compact);
 
   qCDebug(mqttPublisher) << "Publishing" << payload << "to" << topic;
-  client_.publish(QMqttTopicName{topic}, payload, /*qos=*/1);
+  client_->publish(QMqttTopicName{topic}, payload, /*qos=*/1);
 }

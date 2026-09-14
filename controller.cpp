@@ -3,6 +3,7 @@
 #include <QtCore/QEvent>
 #include <QtCore/QFile>
 #include <QtCore/QSettings>
+#include <QtCore/QSysInfo>
 #include <QtCore/QtDebug>
 #include <QtNetwork/QNetworkInterface>
 
@@ -19,6 +20,11 @@ const auto kConfigPath = QStringLiteral(":/qt-hass/config");
 const auto kHassUrlKey = QStringLiteral("connection/url");
 const auto kHassTokenKey = QStringLiteral("connection/token");
 const auto kIdleTimeoutKey = QStringLiteral("idleTimeout");
+const auto kMqttHostKey = QStringLiteral("mqtt/host");
+const auto kMqttPortKey = QStringLiteral("mqtt/port");
+const auto kMqttUsernameKey = QStringLiteral("mqtt/username");
+const auto kMqttPasswordKey = QStringLiteral("mqtt/password");
+const auto kDefaultMqttPort = 1883;
 } // namespace
 
 Controler::Controler(QObject *parent)
@@ -40,6 +46,64 @@ Controler::Controler(QObject *parent)
   is_idle_timer_.setSingleShot(true);
 
   loadConnection();
+  loadMqttConfig();
+}
+
+void Controler::loadMqttConfig() {
+  const QSettings settings;
+  mqtt_broker_host_ =
+      settings.value(kMqttHostKey, bundledValue("MQTT_BROKER_HOST")).toString();
+  mqtt_broker_port_ =
+      settings
+          .value(kMqttPortKey, bundledInt("MQTT_BROKER_PORT", kDefaultMqttPort))
+          .toInt();
+  mqtt_username_ =
+      settings.value(kMqttUsernameKey, bundledValue("MQTT_USERNAME")).toString();
+  mqtt_password_ =
+      settings.value(kMqttPasswordKey, bundledValue("MQTT_PASSWORD")).toString();
+}
+
+void Controler::setMqttConfig(const QString &host, int port,
+                              const QString &username,
+                              const QString &password) {
+  if (port <= 0 || port > 65535)
+    port = kDefaultMqttPort;
+  if (host == mqtt_broker_host_ && port == mqtt_broker_port_ &&
+      username == mqtt_username_ && password == mqtt_password_)
+    return;
+
+  QSettings settings;
+  settings.setValue(kMqttHostKey, host);
+  settings.setValue(kMqttPortKey, port);
+  settings.setValue(kMqttUsernameKey, username);
+  settings.setValue(kMqttPasswordKey, password);
+  loadMqttConfig();
+  Q_EMIT mqttConfigChanged();
+}
+
+void Controler::clearSavedMqttConfig() {
+  QSettings settings;
+  settings.remove(kMqttHostKey);
+  settings.remove(kMqttPortKey);
+  settings.remove(kMqttUsernameKey);
+  settings.remove(kMqttPasswordKey);
+  loadMqttConfig();
+  Q_EMIT mqttConfigChanged();
+}
+
+bool Controler::mqttSupported() noexcept {
+#ifdef QTHASS_HAS_MQTT
+  return true;
+#else
+  return false;
+#endif
+}
+
+void Controler::setMqttConnected(bool connected) {
+  if (mqtt_connected_ == connected)
+    return;
+  mqtt_connected_ = connected;
+  Q_EMIT mqttConnectedChanged();
 }
 
 void Controler::loadConnection() {
@@ -171,4 +235,36 @@ QString Controler::deviceId() const {
   // No real interface found (sandboxed/virtual environment) -- a
   // locally-administered placeholder so the id is still non-empty.
   return QStringLiteral("02:00:00:00:00:00");
+}
+
+QString Controler::deviceName() const {
+  const QString name = QSysInfo::machineHostName();
+  return name.isEmpty() ? QStringLiteral("qthomeassistant") : name;
+}
+
+QStringList Controler::ipAddresses() const {
+  QStringList addresses;
+  for (const QHostAddress &address : QNetworkInterface::allAddresses()) {
+    if (address.protocol() == QAbstractSocket::IPv4Protocol && !address.isLoopback())
+      addresses << address.toString();
+  }
+  return addresses;
+}
+
+QString Controler::deviceIp() const {
+  const QStringList addresses = ipAddresses();
+  return addresses.isEmpty() ? QStringLiteral("127.0.0.1") : addresses.first();
+}
+
+QVariantMap Controler::systemInfo() const {
+  return {
+      {"name", deviceName()},
+      {"ipAddresses", ipAddresses()},
+      {"mac", deviceId()},
+      {"appVersion", QStringLiteral(APP_VERSION)},
+      {"system", QSysInfo::prettyProductName()},
+      {"qtVersion", QString::fromLatin1(qVersion())},
+      {"remoteAdminEnabled", !remoteAdminPassword().isEmpty()},
+      {"remoteAdminPort", remoteAdminPort()},
+  };
 }

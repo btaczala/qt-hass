@@ -4,7 +4,9 @@
 #include <QQmlContext>
 
 #include "controller.h"
+#ifdef QTHASS_HAS_MQTT
 #include "mqttpublisher.h"
+#endif
 #include "remoteadmin.h"
 
 int main(int argc, char *argv[]) {
@@ -45,8 +47,14 @@ int main(int argc, char *argv[]) {
   RemoteAdmin remoteAdmin(controler);
   remoteAdmin.start();
 
+#ifdef QTHASS_HAS_MQTT
   MqttPublisher mqttPublisher(controler);
   mqttPublisher.start();
+#else
+  if (!controler->mqttBrokerHost().isEmpty())
+    qWarning() << "MQTT_BROKER_HOST is set, but this build has no Qt MQTT "
+                  "support -- screensaver state won't be published";
+#endif
 
   return app.exec();
 }
