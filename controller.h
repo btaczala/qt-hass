@@ -39,6 +39,8 @@ class Controler : public QObject {
   Q_PROPERTY(QString mqttPassword READ mqttPassword NOTIFY mqttConfigChanged)
   // Whether this build has Qt MQTT at all (MqttPublisher compiled in).
   Q_PROPERTY(bool mqttSupported READ mqttSupported CONSTANT)
+  // Whether this build has AnimatedBackground's dithering shader.
+  Q_PROPERTY(bool backgroundShaderSupported READ backgroundShaderSupported CONSTANT)
   // Set by MqttPublisher; always false without mqttSupported.
   Q_PROPERTY(bool mqttConnected READ mqttConnected NOTIFY mqttConnectedChanged)
 
@@ -101,6 +103,7 @@ public:
   Q_INVOKABLE void clearSavedMqttConfig();
 
   static bool mqttSupported() noexcept;
+  static bool backgroundShaderSupported() noexcept;
   bool mqttConnected() const noexcept { return mqtt_connected_; }
   void setMqttConnected(bool connected);
 

@@ -14,7 +14,7 @@ find_package(
   COMPONENTS Gui Quick Multimedia WebSockets QuickControls2 Network
   REQUIRED
   # Optional: without it MqttPublisher is left out of the build (see below).
-  OPTIONAL_COMPONENTS Mqtt)
+  OPTIONAL_COMPONENTS Mqtt ShaderTools)
 
 if(QT_KNOWN_POLICY_QTP0002)
   qt_policy(SET QTP0002 NEW)
@@ -126,7 +126,8 @@ qt_add_qml_module(
   fonts/materialdesignicons-webfont.ttf
   images/lightbulb.svg
   images/lightbulb-off.svg
-  images/screensaver.gif)
+  images/screensaver.gif
+  images/noise.png)
 
 # Qt only looks for the Controls configuration at :/qtquickcontrols2.conf, and
 # qt_add_qml_module pins its RESOURCES under RESOURCE_PREFIX/URI -- so this file
@@ -158,6 +159,17 @@ target_sources(qthomeassistant PRIVATE remoteadmin.h remoteadmin.cpp)
 # Qt MQTT has no prebuilt package for this project's kits and has to be built
 # from source (see CLAUDE.md), so it's optional: without it the app builds
 # without MqttPublisher, and RemoteAdmin reports MQTT as disabled.
+# Qt Shader Tools is optional too: with it AnimatedBackground draws a dithered
+# shader gradient, without it a plain gradient with a noise overlay.
+if(COMMAND qt_add_shaders)
+  qt_add_shaders(qthomeassistant "background_shaders" PREFIX "/res/QtHomeAssistant"
+                 FILES shaders/background.frag)
+  target_compile_definitions(qthomeassistant PRIVATE QTHASS_HAS_SHADERS)
+  message(STATUS "Qt Shader Tools found: dithered background shader enabled")
+else()
+  message(STATUS "Qt Shader Tools not found: using the plain background gradient")
+endif()
+
 if(TARGET Qt6::Mqtt)
   target_sources(qthomeassistant PRIVATE mqttpublisher.h mqttpublisher.cpp)
   target_link_libraries(qthomeassistant PRIVATE Qt6::Mqtt)

@@ -99,6 +99,14 @@ bool Controler::mqttSupported() noexcept {
 #endif
 }
 
+bool Controler::backgroundShaderSupported() noexcept {
+#ifdef QTHASS_HAS_SHADERS
+  return true;
+#else
+  return false;
+#endif
+}
+
 void Controler::setMqttConnected(bool connected) {
   if (mqtt_connected_ == connected)
     return;
