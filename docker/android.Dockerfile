@@ -84,10 +84,16 @@ ARG QT_INSTALL_DIR=/opt/qt
 # Two kits: a Linux desktop one purely to act as QT_HOST_PATH for
 # cross-compiling (its own Gui/Quick/etc. are never linked into the Android
 # app), and the android_arm64_v8a target kit that actually builds the app.
-RUN aqt install-qt linux desktop "${QT_VERSION}" gcc_64 \
+#
+# Package names as the Qt online repository has them from Qt 6.7 on (both kits
+# this file builds): the desktop kit's arch is linux_gcc_64, not gcc_64 (it
+# still installs into a gcc_64 directory), and Android kits are published under
+# the all_os host rather than linux -- the old names find no packages at all.
+RUN aqt install-qt linux desktop "${QT_VERSION}" linux_gcc_64 \
       -O "${QT_INSTALL_DIR}" -m ${QT_MODULES} \
-  && aqt install-qt linux android "${QT_VERSION}" android_arm64_v8a \
-      -O "${QT_INSTALL_DIR}" -m ${QT_MODULES}
+  && aqt install-qt all_os android "${QT_VERSION}" android_arm64_v8a \
+      -O "${QT_INSTALL_DIR}" -m ${QT_MODULES} \
+  && ls -d "${QT_INSTALL_DIR}/${QT_VERSION}/gcc_64/bin" "${QT_INSTALL_DIR}/${QT_VERSION}/android_arm64_v8a/bin"
 
 ENV QT_HOST_DIR="${QT_INSTALL_DIR}/${QT_VERSION}/gcc_64"
 ENV QT_ANDROID_DIR="${QT_INSTALL_DIR}/${QT_VERSION}/android_arm64_v8a"
