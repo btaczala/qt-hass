@@ -23,6 +23,10 @@ EntityBase {
     property string motionEntity
     property string darkEntity
     property string lastMotionEntity
+    // Optional; the live view plays this directly (e.g. a UniFi Protect RTSPS
+    // channel, rtsps://<nvr>:7441/<alias>) instead of Home Assistant's HLS
+    // stream, which takes 9-12 s to start. See CameraStreamPopup.
+    property string streamUrl
 
     readonly property var attributes: root.entity_data?.attributes ?? ({})
     readonly property string displayName: root.name || root.attributes.friendly_name || root.entity_id
@@ -121,5 +125,6 @@ EntityBase {
         entity_id: root.entity_id
         name: root.displayName
         sensors: sensors
+        streamUrl: root.streamUrl
     }
 }

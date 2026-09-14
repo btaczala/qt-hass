@@ -8,11 +8,17 @@ import QtHomeAssistant
 import "CameraUrls.js" as CameraUrls
 
 // Full-screen live view for one camera entity, opened by tapping a
-// CameraCard. Fetches an HLS URL from Home Assistant's "camera/stream"
-// websocket command -- the same one its own frontend uses -- and plays it
-// with QtMultimedia's Video type; like the camera_proxy snapshot URL
-// CameraCard loads, the HLS URL already carries its own access token in the
-// path, so no Authorization header is needed for either.
+// CameraCard. Plays `streamUrl` directly when set (e.g. a UniFi Protect
+// RTSPS channel); otherwise fetches an HLS URL from Home Assistant's
+// "camera/stream" websocket command -- the same one its own frontend uses.
+// Either way QtMultimedia's Video type plays it. Like the camera_proxy
+// snapshot URL CameraCard loads, the HLS URL already carries its own access
+// token in the path, so no Authorization header is needed for either.
+//
+// HA's stream worker stops ~30 s after its last viewer, so an HLS open is
+// nearly always cold: it connects to the camera and waits for the first
+// complete segment (8 s here) -- 9-12 s before the first frame, measured.
+// A direct RTSP(S) URL starts in about a second.
 Popup {
     id: root
 
@@ -20,6 +26,8 @@ Popup {
     property string name
     // Shown under the name, when set.
     property CameraSensors sensors
+    // Played as-is instead of asking Home Assistant for an HLS stream.
+    property string streamUrl
 
     property bool loading: false
     property string error: ""
@@ -38,6 +46,10 @@ Popup {
 
     function fetchStream() {
         root.error = "";
+        if (root.streamUrl) {
+            video.source = root.streamUrl;
+            return;
+        }
         root.loading = true;
         const sent = HassAPI.command("camera/stream", {
             entity_id: root.entity_id,

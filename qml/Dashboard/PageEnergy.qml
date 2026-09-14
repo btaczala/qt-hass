@@ -6,8 +6,9 @@ import QtQuick.Layouts
 
 import QtHomeAssistant
 
-// Energy overview: power flowing between solar, battery, grid and home, from
-// Home Assistant (HassEnergySource); tapping a circle opens its details.
+// Energy overview: power flowing between solar, battery, grid and home right
+// now, or energy since midnight, from Home Assistant (HassEnergySource);
+// tapping a circle opens its details.
 Item {
     id: root
 
@@ -118,6 +119,8 @@ Item {
     // Energy totals, for history
     readonly property string gridImportTotalEntity: "sensor.selfa_inverter_total_grid_purchase"
     readonly property string gridExportTotalEntity: "sensor.selfa_inverter_total_grid_injection"
+    readonly property string batteryChargeTotalEntity: "sensor.selfa_inverter_energy_charged_into_battery"
+    readonly property string batteryDischargeTotalEntity: "sensor.selfa_inverter_energy_discharged_from_battery"
     readonly property string homeEnergyTotalEntity: "sensor.selfa_inverter_home_energy"
     readonly property string solarEnergyTotalEntity: "sensor.selfa_inverter_total_pv_generation"
 
@@ -153,6 +156,8 @@ Item {
         homeEnergyTodayEntity: root.homeEnergyTodayEntity
         gridImportTotalEntity: root.gridImportTotalEntity
         gridExportTotalEntity: root.gridExportTotalEntity
+        batteryChargeTotalEntity: root.batteryChargeTotalEntity
+        batteryDischargeTotalEntity: root.batteryDischargeTotalEntity
         homeEnergyTotalEntity: root.homeEnergyTotalEntity
         solarEnergyTotalEntity: root.solarEnergyTotalEntity
         solarForecastEntity: root.solarForecastEntity
@@ -165,6 +170,20 @@ Item {
         anchors.fill: parent
         anchors.margins: 20
         spacing: 8
+
+        TabBar {
+            id: modeTabs
+            Layout.alignment: Qt.AlignHCenter
+            Layout.preferredWidth: 320
+            Material.background: "transparent"
+
+            TabButton {
+                text: qsTr("Power now")
+            }
+            TabButton {
+                text: qsTr("Energy today")
+            }
+        }
 
         // The card sizes itself to its diagram; this area only decides the
         // scale, the largest at which it fits.
@@ -179,10 +198,12 @@ Item {
                 diagramScale: Math.min((cardArea.width - card.leftPadding - card.rightPadding) / card.designWidth,
                                        (cardArea.height - card.topPadding - card.bottomPadding) / card.designHeight)
 
+                mode: modeTabs.currentIndex === 1 ? "energy" : "power"
                 solarPower: source.solarPower
                 gridPower: source.gridPower
                 batteryPower: source.batteryPower
                 batterySoc: source.batterySoc
+                energy: source.energyFlows
 
                 onDetailsRequested: node => {
                     details.node = node;

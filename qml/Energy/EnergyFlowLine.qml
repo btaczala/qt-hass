@@ -13,11 +13,12 @@ Item {
     property point to
     property point control: Qt.point((from.x + to.x) / 2, (from.y + to.y) / 2)
 
-    // Watts flowing from `from` to `to`; negative flows the other way.
+    // Watts (or, in the card's energy mode, Wh) flowing from `from` to `to`;
+    // negative flows the other way.
     property real power: 0
     // Largest flow currently on the card, which travels fastest.
     property real maxPower: 1
-    // Flows below this many watts count as idle: grey line, no dot.
+    // Flows below this many W (or Wh) count as idle: grey line, no dot.
     property real threshold: 10
 
     property color color

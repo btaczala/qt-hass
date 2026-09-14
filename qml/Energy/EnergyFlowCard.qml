@@ -8,24 +8,36 @@ import QtQuick.Shapes
 
 import QtHomeAssistant
 
+import "EnergyFlows.js" as EnergyFlows
+import "Details/EnergyFormat.js" as EnergyFormat
+
 // A power flow diagram in the style of power-flow-card-plus
 // (github.com/flixlix/power-flow-card-plus): solar on top, grid on the left,
 // battery on the right, home at the bottom, joined by lines with dots moving
 // along every route power is taking. Tapping a circle asks for its details.
 //
-// Inputs are the same few instantaneous readings HA's energy sensors give; the
-// per-route flows are derived from them the same way that card does -- export
-// and battery charging are served from solar first, anything left from the
-// grid or the battery respectively.
+// Two modes: "power" shows watts right now, "energy" watt-hours since
+// midnight, like energy-flow-card-plus. In power mode the inputs are the same
+// few instantaneous readings HA's energy sensors give, and the per-route flows
+// are derived from them the same way that card does (EnergyFlows.split()). In
+// energy mode the routes come ready-made in `energy`, since a day's totals
+// alone can't tell e.g. night-time grid charging from solar charging.
 Pane {
     id: root
+
+    // "power" or "energy".
+    property string mode: "power"
 
     // Watts. Sign conventions follow HA: grid positive while importing,
     // battery positive while discharging.
     property real solarPower: 0
     property real gridPower: 0
     property real batteryPower: 0
+    // Shown, and picks the battery icon, in both modes.
     property real batterySoc: 0
+
+    // Wh since midnight, as an EnergyFlows.split() result (or a sum of them).
+    property var energy: EnergyFlows.empty()
 
     // Tapping a circle asks for its details; `node` is "solar", "grid",
     // "battery" or "home".
@@ -44,16 +56,18 @@ Pane {
     readonly property real batteryDischarge: Math.max(0, root.batteryPower)
     readonly property real batteryCharge: Math.max(0, -root.batteryPower)
 
-    readonly property real solarToGrid: Math.min(root.gridExport, root.solarPower)
-    readonly property real batteryToGrid: Math.min(root.batteryDischarge, root.gridExport - root.solarToGrid)
-    readonly property real solarToBattery: Math.min(root.batteryCharge, root.solarPower - root.solarToGrid)
-    readonly property real gridToBattery: Math.min(root.gridImport, root.batteryCharge - root.solarToBattery)
-    readonly property real solarToHome: Math.max(0, root.solarPower - root.solarToGrid - root.solarToBattery)
-    readonly property real batteryToHome: Math.max(0, root.batteryDischarge - root.batteryToGrid)
-    readonly property real gridToHome: Math.max(0, root.gridImport - root.gridToBattery)
-    readonly property real homePower: root.solarToHome + root.batteryToHome + root.gridToHome
+    // Live power by route, whichever mode is shown.
+    readonly property var powerFlows: EnergyFlows.split(root.solarPower, root.gridImport, root.gridExport, root.batteryCharge, root.batteryDischarge)
+    readonly property real solarToHome: root.powerFlows.solarToHome
+    readonly property real batteryToHome: root.powerFlows.batteryToHome
+    readonly property real gridToHome: root.powerFlows.gridToHome
+    readonly property real homePower: root.powerFlows.home
 
-    readonly property real maxFlow: Math.max(root.solarToHome, root.solarToGrid, root.solarToBattery, root.gridToHome, root.batteryToHome, root.gridToBattery, root.batteryToGrid)
+    // What the diagram shows: W or Wh, per the mode.
+    readonly property bool energyMode: root.mode === "energy"
+    readonly property var flows: root.energyMode ? root.energy : root.powerFlows
+
+    readonly property real maxFlow: Math.max(root.flows.solarToHome, root.flows.solarToGrid, root.flows.solarToBattery, root.flows.gridToHome, root.flows.batteryToHome, root.flows.gridToBattery, root.flows.batteryToGrid)
 
     // The diagram is laid out in these fixed units, then drawn at
     // diagramScale; the card sizes itself to the scaled diagram.
@@ -64,11 +78,8 @@ Pane {
     // How far off-center lines that share a circle side attach.
     readonly property real attachOffset: 14
 
-    function formatPower(watts: real): string {
-        const w = Math.abs(watts);
-        if (w < 1000)
-            return Math.round(w) + " W";
-        return (w / 1000).toFixed(w < 10000 ? 2 : 1) + " kW";
+    function formatValue(value: real): string {
+        return root.energyMode ? EnergyFormat.energy(value) : EnergyFormat.power(value);
     }
 
     function batteryIcon(soc: real, charging: bool): string {
@@ -103,12 +114,13 @@ Pane {
     contentWidth: root.designWidth * root.diagramScale
     contentHeight: root.designHeight * root.diagramScale
 
-    // A value row inside a node: a direction arrow (optional) and a power.
+    // A value row inside a node: a direction arrow (optional) and a power or
+    // energy, per the mode.
     component FlowValue: RowLayout {
         id: flowValue
 
         property string icon
-        property real watts
+        property real value
         property color color: Material.foreground
 
         Layout.alignment: Qt.AlignHCenter
@@ -121,7 +133,7 @@ Pane {
             color: flowValue.color
         }
         Label {
-            text: root.formatPower(flowValue.watts)
+            text: root.formatValue(flowValue.value)
             font.pixelSize: 11
             color: flowValue.color
         }
@@ -142,7 +154,7 @@ Pane {
                 anchors.fill: parent
                 from: root.bottomOf(solar, 0)
                 to: root.topOf(home, 0)
-                power: root.solarToHome
+                power: root.flows.solarToHome
                 maxPower: root.maxFlow
                 color: root.solarColor
                 idleColor: root.idleColor
@@ -152,7 +164,7 @@ Pane {
                 from: root.bottomOf(solar, -root.attachOffset)
                 to: root.rightOf(grid, -root.attachOffset)
                 control: Qt.point(from.x, to.y)
-                power: root.solarToGrid
+                power: root.flows.solarToGrid
                 maxPower: root.maxFlow
                 color: root.gridExportColor
                 idleColor: root.idleColor
@@ -162,7 +174,7 @@ Pane {
                 from: root.bottomOf(solar, root.attachOffset)
                 to: root.leftOf(battery, -root.attachOffset)
                 control: Qt.point(from.x, to.y)
-                power: root.solarToBattery
+                power: root.flows.solarToBattery
                 maxPower: root.maxFlow
                 color: root.batteryChargeColor
                 idleColor: root.idleColor
@@ -171,7 +183,8 @@ Pane {
                 anchors.fill: parent
                 from: root.rightOf(grid, 0)
                 to: root.leftOf(battery, 0)
-                power: root.gridToBattery - root.batteryToGrid
+                // Net: over a day, energy can have gone both ways.
+                power: root.flows.gridToBattery - root.flows.batteryToGrid
                 maxPower: root.maxFlow
                 color: power >= 0 ? root.gridImportColor : root.gridExportColor
                 idleColor: root.idleColor
@@ -181,7 +194,7 @@ Pane {
                 from: root.rightOf(grid, root.attachOffset)
                 to: root.topOf(home, -root.attachOffset)
                 control: Qt.point(to.x, from.y)
-                power: root.gridToHome
+                power: root.flows.gridToHome
                 maxPower: root.maxFlow
                 color: root.gridImportColor
                 idleColor: root.idleColor
@@ -191,7 +204,7 @@ Pane {
                 from: root.leftOf(battery, root.attachOffset)
                 to: root.topOf(home, root.attachOffset)
                 control: Qt.point(to.x, from.y)
-                power: root.batteryToHome
+                power: root.flows.batteryToHome
                 maxPower: root.maxFlow
                 color: root.batteryDischargeColor
                 idleColor: root.idleColor
@@ -208,7 +221,7 @@ Pane {
                 onClicked: root.detailsRequested("solar")
 
                 FlowValue {
-                    watts: root.solarPower
+                    value: root.flows.solar
                 }
             }
 
@@ -219,18 +232,18 @@ Pane {
                 labelBelow: true
                 label: qsTr("Grid")
                 icon: "mdi:transmission-tower"
-                color: root.gridExport > root.gridImport ? root.gridExportColor : root.gridImportColor
+                color: root.flows.gridExport > root.flows.gridImport ? root.gridExportColor : root.gridImportColor
                 clickable: true
                 onClicked: root.detailsRequested("grid")
 
                 FlowValue {
                     icon: "mdi:arrow-left"
-                    watts: root.gridExport
+                    value: root.flows.gridExport
                     color: root.gridExportColor
                 }
                 FlowValue {
                     icon: "mdi:arrow-right"
-                    watts: root.gridImport
+                    value: root.flows.gridImport
                     color: root.gridImportColor
                 }
             }
@@ -247,12 +260,12 @@ Pane {
                 onClicked: root.detailsRequested("home")
 
                 FlowValue {
-                    watts: root.homePower
+                    value: root.flows.home
                 }
             }
 
-            // Home's outline: a ring split by where its power is coming from,
-            // clockwise from the top -- solar, battery, grid.
+            // Home's outline: a ring split by where its power (or energy) is
+            // coming from, clockwise from the top -- solar, battery, grid.
             Shape {
                 id: ring
                 x: home.x
@@ -261,10 +274,10 @@ Pane {
                 height: home.height
                 preferredRendererType: Shape.CurveRenderer
 
-                readonly property real total: Math.max(1, root.homePower)
-                readonly property real solarSweep: 360 * root.solarToHome / ring.total
-                readonly property real batterySweep: 360 * root.batteryToHome / ring.total
-                readonly property real gridSweep: 360 * root.gridToHome / ring.total
+                readonly property real total: Math.max(1, root.flows.home)
+                readonly property real solarSweep: 360 * root.flows.solarToHome / ring.total
+                readonly property real batterySweep: 360 * root.flows.batteryToHome / ring.total
+                readonly property real gridSweep: 360 * root.flows.gridToHome / ring.total
 
                 component RingSegment: ShapePath {
                     id: segment
@@ -301,8 +314,8 @@ Pane {
                 }
                 RingSegment {
                     startAngle: -90 + ring.solarSweep + ring.batterySweep
-                    sweep: root.homePower > 0 ? ring.gridSweep : 360
-                    color: root.homePower > 0 ? root.gridImportColor : root.idleColor
+                    sweep: root.flows.home > 0 ? ring.gridSweep : 360
+                    color: root.flows.home > 0 ? root.gridImportColor : root.idleColor
                 }
             }
 
@@ -313,7 +326,7 @@ Pane {
                 labelBelow: true
                 label: qsTr("Battery")
                 icon: root.batteryIcon(root.batterySoc, root.batteryCharge > 0)
-                color: root.batteryCharge > root.batteryDischarge ? root.batteryChargeColor : root.batteryDischargeColor
+                color: root.flows.batteryCharge > root.flows.batteryDischarge ? root.batteryChargeColor : root.batteryDischargeColor
                 clickable: true
                 onClicked: root.detailsRequested("battery")
 
@@ -324,12 +337,12 @@ Pane {
                 }
                 FlowValue {
                     icon: "mdi:arrow-down"
-                    watts: root.batteryCharge
+                    value: root.flows.batteryCharge
                     color: root.batteryChargeColor
                 }
                 FlowValue {
                     icon: "mdi:arrow-up"
-                    watts: root.batteryDischarge
+                    value: root.flows.batteryDischarge
                     color: root.batteryDischargeColor
                 }
             }

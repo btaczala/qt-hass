@@ -29,21 +29,25 @@ Flickable {
             Layout.fillWidth: true
             Layout.preferredHeight: 220
             entity_id: "camera.g3_flex_high_resolution_channel"
+            streamUrl: "rtsps://192.168.1.1:7441/35uQS9Oe0JmexY3X?enableSrtp"
         }
         CameraCard {
             Layout.fillWidth: true
             Layout.preferredHeight: 220
             entity_id: "camera.g5_bullet_high"
+            streamUrl: "rtsps://192.168.1.1:7441/Bse9MSF2o74QlETC?enableSrtp"
         }
         CameraCard {
             Layout.fillWidth: true
             Layout.preferredHeight: 220
             entity_id: "camera.g5_turret_ultra_high_resolution_channel"
+            streamUrl: "rtsps://192.168.1.1:7441/KLVkA2PkVs06RHnI?enableSrtp"
         }
         CameraCard {
             Layout.fillWidth: true
             Layout.preferredHeight: 220
             entity_id: "camera.g5_turret_ultra_high_resolution_channel_2"
+            streamUrl: "rtsps://192.168.1.1:7441/QHeiGmzjLrgiMT69?enableSrtp"
         }
     }
 }

@@ -5,6 +5,8 @@ import QtQuick
 
 import QtHomeAssistant
 
+import "EnergyFlows.js" as EnergyFlows
+
 // Home Assistant data for the energy page, in the shape EnergyFlowCard and the
 // detail overlays take: live readings in W/Wh (grid positive while importing,
 // battery positive while discharging), and chart series as [{x, y}] with x in
@@ -38,13 +40,16 @@ Item {
     required property string solarEnergyTodayEntity
     required property string homeEnergyTodayEntity
     // Ever-increasing energy totals (Wh or kWh), used through statistics
-    // (sum): grid import and export, and home consumption.
+    // (sum): grid import and export, battery charge and discharge, and home
+    // consumption.
     required property string gridImportTotalEntity
     required property string gridExportTotalEntity
+    required property string batteryChargeTotalEntity
+    required property string batteryDischargeTotalEntity
     required property string homeEnergyTotalEntity
-    // Solar production's lifetime total, for production per day. Not the
-    // daily one (solarEnergyTodayEntity): its statistics' change is garbage
-    // across the midnight reset (negative days).
+    // Solar production's lifetime total, for production per day and energy
+    // by route today. Not the daily one (solarEnergyTodayEntity): its
+    // statistics' change is garbage across the midnight reset (negative days).
     required property string solarEnergyTotalEntity
     // Solcast's forecast for today, read from its `detailedForecast`
     // attribute; its state (the day's total) is also read from history for
@@ -176,6 +181,10 @@ Item {
     // price.
     property real importedEnergy: 0
     property real exportedEnergy: 0
+    // Wh since midnight by route, for EnergyFlowCard's energy mode: an
+    // EnergyFlows.split() of each hour's totals, summed, so e.g. the battery
+    // charging from the grid at night isn't credited to the day's solar.
+    property var energyFlows: EnergyFlows.empty()
     readonly property real importCost: root.costOf(root.importSteps, root.importPrices)
     readonly property real exportRevenue: root.costOf(root.exportSteps, root.exportPrices)
 
@@ -270,7 +279,8 @@ Item {
                 stats[id] = means(id);
             root.consumerStats = stats;
         });
-        root.statistics([root.gridImportTotalEntity, root.gridExportTotalEntity], root.midnight, "5minute", ["change"], result => {
+        const totals = [root.solarEnergyTotalEntity, root.gridImportTotalEntity, root.gridExportTotalEntity, root.batteryChargeTotalEntity, root.batteryDischargeTotalEntity];
+        root.statistics(totals, root.midnight, "5minute", ["change"], result => {
             const steps = id => (result[id] ?? []).map(r => ({
                         x: (r.start - root.midnight) / 3600000,
                         y: r.change ?? 0
@@ -279,6 +289,18 @@ Item {
             root.exportSteps = steps(root.gridExportTotalEntity);
             root.importedEnergy = root.importSteps.reduce((sum, s) => sum + s.y, 0);
             root.exportedEnergy = root.exportSteps.reduce((sum, s) => sum + s.y, 0);
+
+            // Hourly rather than per 5 minutes: these counters step in
+            // 100 Wh, too coarse to split a 5-minute step by route.
+            const hours = totals.map(() => new Array(24).fill(0));
+            totals.forEach((id, i) => {
+                for (const s of steps(id))
+                    hours[i][Math.min(23, Math.max(0, Math.floor(s.x)))] += s.y;
+            });
+            let flows = EnergyFlows.empty();
+            for (let h = 0; h < 24; ++h)
+                flows = EnergyFlows.add(flows, EnergyFlows.split(hours[0][h], hours[1][h], hours[2][h], hours[3][h], hours[4][h]));
+            root.energyFlows = flows;
         });
     }
 

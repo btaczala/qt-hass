@@ -134,6 +134,7 @@ qt_add_qml_module(
   qml/Cameras/CameraUrls.js
   qml/Energy/EnergyFlowCard.qml
   qml/Energy/EnergyFlowLine.qml
+  qml/Energy/EnergyFlows.js
   qml/Energy/EnergyNode.qml
   qml/Energy/EnergySummary.qml
   qml/Energy/HassEnergySource.qml
