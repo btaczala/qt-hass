@@ -53,7 +53,8 @@ public slots:
 
   // Sends a one-off WebSocket API command, e.g.
   // command("recorder/statistics_during_period", {...}, this, fn), and calls
-  // fn(ok, resultJson) with the reply's `result` as a JSON string. The reply
+  // fn(ok, resultJson, errorMessage) with the reply's `result` as a JSON
+  // string, and HA's error message when it failed. The reply
   // is dropped if `owner` is destroyed first or the connection goes down
   // before it arrives, so pass the calling QML object as `owner`. Returns
   // false (and never calls back) when not connected.

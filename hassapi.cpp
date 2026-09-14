@@ -103,7 +103,8 @@ HassAPI::HassAPI(QObject *parent)
     const QByteArray wrapped =
         QJsonDocument{QJsonArray{payload["result"]}}.toJson(QJsonDocument::Compact);
     const QString serialized = QString::fromUtf8(wrapped.sliced(1, wrapped.size() - 2));
-    if (const QJSValue ret = QJSValue{command.callback}.call({success, serialized});
+    if (const QJSValue ret = QJSValue{command.callback}.call(
+            {success, serialized, payload["error"]["message"].toString()});
         ret.isError())
       qCCritical(hassAPI) << "Command callback threw:" << ret.toString();
   };

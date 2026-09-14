@@ -113,6 +113,9 @@ qt_add_qml_module(
   qml/MdiIcon.qml
   qml/IconImage.qml
   qml/Screensaver.qml
+  qml/Alarm/AlarmCard.qml
+  qml/Alarm/AlarmEntity.qml
+  qml/Alarm/AlarmPopup.qml
   qml/Clock.qml
   qml/DoNotDisturb.qml
   qml/Cards/Weather.qml

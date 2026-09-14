@@ -103,23 +103,11 @@ Flickable {
                         entity_id: "lock.drzwi_wejsciowe"
                         stateColor: frontDoor.isUnavailable ? frontDoor.Material.hintTextColor : frontDoor.entityState === "locked" ? root.green : root.red
                     }
-                    Tile {
-                        id: alarm
+                    AlarmCard {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        entity_id: "alarm_control_panel.somfy_home_alarm_dom_bartek_taczala"
+                        entityId: "alarm_control_panel.somfy_home_alarm_dom_bartek_taczala"
                         name: qsTr("Alarm")
-                        stateColor: {
-                            if (alarm.isUnavailable)
-                                return alarm.Material.hintTextColor;
-                            if (alarm.entityState === "disarmed")
-                                return root.blue;
-                            if (alarm.entityState === "triggered")
-                                return root.red;
-                            if (["arming", "pending", "disarming"].includes(alarm.entityState))
-                                return root.orange;
-                            return root.green;
-                        }
                     }
                 }
             }
