@@ -46,11 +46,11 @@ ApplicationWindow {
 
     BusyIndicator {
         anchors.centerIn: parent
-        visible: !HassAPI.connected
+        visible: !HassAPI.connected && Controler.setupCompleted
     }
 
     Loader {
-        active: HassAPI.connected
+        active: HassAPI.connected && Controler.setupCompleted
         anchors.fill: parent
         sourceComponent: Dashboard {
             leadingInset: menuButton.width
@@ -65,6 +65,13 @@ ApplicationWindow {
         onClicked: drawer.open()
     }
 
+    // First run, or set up again from the settings page.
+    Loader {
+        anchors.fill: parent
+        active: !Controler.setupCompleted
+        sourceComponent: SetupWizard {}
+    }
+
     Screensaver {
         visible: Controler.screensaverActive
     }
@@ -73,14 +80,22 @@ ApplicationWindow {
         entityId: "input_boolean.bartek_nie_przeszkadac"
     }
 
-    Component.onCompleted: {
-        HassAPI.connect();
-    }
+    // Until set up, the wizard connects once it has a token.
+    Component.onCompleted: if (Controler.setupCompleted)
+        HassAPI.connect()
 
     Connections {
         target: HassAPI
         function onConnectedChanged() {
             Controler.hassConnected = HassAPI.connected;
+        }
+    }
+
+    Connections {
+        target: Controler
+        function onSetupCompletedChanged() {
+            if (!Controler.setupCompleted)
+                drawer.close();
         }
     }
 }

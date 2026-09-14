@@ -31,10 +31,22 @@ const auto kMqttPortKey = QStringLiteral("mqtt/port");
 const auto kMqttUsernameKey = QStringLiteral("mqtt/username");
 const auto kMqttPasswordKey = QStringLiteral("mqtt/password");
 const auto kDefaultMqttPort = 1883;
+const auto kSetupCompletedKey = QStringLiteral("setup/completed");
+const auto kDeviceNameKey = QStringLiteral("device/name");
+const auto kRemoteAdminEnabledKey = QStringLiteral("remoteAdmin/enabled");
+const auto kRemoteAdminPasswordKey = QStringLiteral("remoteAdmin/password");
+const auto kRemoteAdminPortKey = QStringLiteral("remoteAdmin/port");
+const auto kDefaultRemoteAdminPort = 2323;
 } // namespace
 
 Controler::Controler(QObject *parent)
     : QObject(parent), has_user_interaction_(false) {
+  // The QML engine constructs its singleton with this constructor, not with
+  // create() (main.cpp resolves it before anything else), so that first
+  // instance has to become the one create()/instance() hand out -- otherwise
+  // HassAPI reads a second instance that never sees changes made from QML.
+  if (!s_instance)
+    s_instance = this;
 
   loadConfig();
 
@@ -297,9 +309,70 @@ QString Controler::deviceId() const {
   return QStringLiteral("02:00:00:00:00:00");
 }
 
-QString Controler::deviceName() const {
+QString Controler::hostName() const {
   const QString name = QSysInfo::machineHostName();
   return name.isEmpty() ? QStringLiteral("qthomeassistant") : name;
+}
+
+QString Controler::deviceName() const {
+  const QString name = QSettings{}.value(kDeviceNameKey).toString();
+  return name.isEmpty() ? hostName() : name;
+}
+
+void Controler::setDeviceName(const QString &name) {
+  const QString old_name = deviceName();
+  QSettings settings;
+  if (name.trimmed().isEmpty())
+    settings.remove(kDeviceNameKey);
+  else
+    settings.setValue(kDeviceNameKey, name.trimmed());
+  if (deviceName() != old_name)
+    Q_EMIT deviceNameChanged();
+}
+
+bool Controler::setupCompleted() const {
+  return QSettings{}.value(kSetupCompletedKey, false).toBool();
+}
+
+void Controler::setSetupCompleted(bool completed) {
+  if (completed == setupCompleted())
+    return;
+  QSettings{}.setValue(kSetupCompletedKey, completed);
+  Q_EMIT setupCompletedChanged();
+}
+
+bool Controler::remoteAdminEnabled() const {
+  return QSettings{}
+      .value(kRemoteAdminEnabledKey,
+             !bundledValue("REMOTE_ADMIN_PASSWORD").isEmpty())
+      .toBool();
+}
+
+QString Controler::remoteAdminPassword() const {
+  return QSettings{}
+      .value(kRemoteAdminPasswordKey, bundledValue("REMOTE_ADMIN_PASSWORD"))
+      .toString();
+}
+
+int Controler::remoteAdminPort() const {
+  return QSettings{}
+      .value(kRemoteAdminPortKey,
+             bundledInt("REMOTE_ADMIN_PORT", kDefaultRemoteAdminPort))
+      .toInt();
+}
+
+void Controler::setRemoteAdminConfig(bool enabled, const QString &password,
+                                     int port) {
+  if (port <= 0 || port > 65535)
+    port = kDefaultRemoteAdminPort;
+  if (enabled == remoteAdminEnabled() && password == remoteAdminPassword() &&
+      port == remoteAdminPort())
+    return;
+  QSettings settings;
+  settings.setValue(kRemoteAdminEnabledKey, enabled);
+  settings.setValue(kRemoteAdminPasswordKey, password);
+  settings.setValue(kRemoteAdminPortKey, port);
+  Q_EMIT remoteAdminConfigChanged();
 }
 
 QStringList Controler::ipAddresses() const {
@@ -324,7 +397,8 @@ QVariantMap Controler::systemInfo() const {
       {"appVersion", QStringLiteral(APP_VERSION)},
       {"system", QSysInfo::prettyProductName()},
       {"qtVersion", QString::fromLatin1(qVersion())},
-      {"remoteAdminEnabled", !remoteAdminPassword().isEmpty()},
+      {"remoteAdminEnabled",
+       remoteAdminEnabled() && !remoteAdminPassword().isEmpty()},
       {"remoteAdminPort", remoteAdminPort()},
   };
 }

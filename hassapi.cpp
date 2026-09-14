@@ -78,6 +78,7 @@ HassAPI::HassAPI(QObject *parent)
   message_handlers_["auth_invalid"] = [this](QJsonDocument payload) {
     qCCritical(hassAPI) << "Authentication rejected by" << url_ << ":"
                         << payload["message"].toString();
+    emit authenticationFailed(payload["message"].toString());
   };
 
   message_handlers_["pong"] = [this](QJsonDocument) { awaiting_pong_ = false; };
@@ -96,11 +97,12 @@ HassAPI::HassAPI(QObject *parent)
     if (!command.owner || !command.callback.isCallable())
       return;
 
-    const QJsonValue result = payload["result"];
-    const QString serialized =
-        result.isObject()  ? QJsonDocument{result.toObject()}.toJson(QJsonDocument::Compact)
-        : result.isArray() ? QJsonDocument{result.toArray()}.toJson(QJsonDocument::Compact)
-                           : QStringLiteral("null");
+    // QJsonDocument only holds an object or array, so wrap the result (which
+    // can also be a plain value, e.g. auth/long_lived_access_token's string)
+    // in an array and strip the brackets again.
+    const QByteArray wrapped =
+        QJsonDocument{QJsonArray{payload["result"]}}.toJson(QJsonDocument::Compact);
+    const QString serialized = QString::fromUtf8(wrapped.sliced(1, wrapped.size() - 2));
     if (const QJSValue ret = QJSValue{command.callback}.call({success, serialized});
         ret.isError())
       qCCritical(hassAPI) << "Command callback threw:" << ret.toString();

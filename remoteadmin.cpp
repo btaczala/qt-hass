@@ -25,11 +25,20 @@ RemoteAdmin::RemoteAdmin(Controler *controler, QObject *parent)
   commands_["listSettings"] = [this](const QUrlQuery &q) { return cmdListSettings(q); };
 
   connect(&server_, &QTcpServer::newConnection, this, &RemoteAdmin::handleNewConnection);
+  // Changed at setup: stop, and listen again with the new settings.
+  connect(controler_, &Controler::remoteAdminConfigChanged, this, [this]() {
+    server_.close();
+    start();
+  });
 }
 
 void RemoteAdmin::start() {
+  if (!controler_->remoteAdminEnabled()) {
+    qCInfo(remoteAdmin) << "Remote admin server disabled";
+    return;
+  }
   if (controler_->remoteAdminPassword().isEmpty()) {
-    qCWarning(remoteAdmin) << "REMOTE_ADMIN_PASSWORD not set in config -- "
+    qCWarning(remoteAdmin) << "No remote admin password set -- "
                               "remote admin server disabled";
     return;
   }
@@ -82,7 +91,7 @@ void RemoteAdmin::handleRequest(QTcpSocket *socket, const QByteArray &requestLin
   const QUrl url{QString::fromUtf8(parts.at(1))};
   const QUrlQuery query{url};
 
-  if (controler_->remoteAdminPassword().isEmpty() ||
+  if (!controler_->remoteAdminEnabled() || controler_->remoteAdminPassword().isEmpty() ||
       query.queryItemValue("password") != controler_->remoteAdminPassword()) {
     writeResponse(socket, 401,
                   {{"status", "Error"}, {"statustext", "Wrong password"}});

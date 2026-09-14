@@ -48,6 +48,20 @@ class Controler : public QObject {
   Q_PROPERTY(bool backgroundShaderSupported READ backgroundShaderSupported CONSTANT)
   // Set by MqttPublisher; always false without mqttSupported.
   Q_PROPERTY(bool mqttConnected READ mqttConnected NOTIFY mqttConnectedChanged)
+  // Whether the first-run setup (qml/Setup/SetupWizard.qml) has been
+  // finished; saved to QSettings.
+  Q_PROPERTY(bool setupCompleted READ setupCompleted WRITE setSetupCompleted
+                 NOTIFY setupCompletedChanged)
+  // Name this device goes by: RemoteAdmin's deviceInfo, the long-lived token
+  // created at setup. Saved to QSettings; empty resets it to the host name.
+  Q_PROPERTY(QString deviceName READ deviceName WRITE setDeviceName NOTIFY
+                 deviceNameChanged)
+  Q_PROPERTY(bool remoteAdminEnabled READ remoteAdminEnabled NOTIFY
+                 remoteAdminConfigChanged)
+  Q_PROPERTY(QString remoteAdminPassword READ remoteAdminPassword NOTIFY
+                 remoteAdminConfigChanged)
+  Q_PROPERTY(int remoteAdminPort READ remoteAdminPort NOTIFY
+                 remoteAdminConfigChanged)
 
 public:
   static Controler *create(QQmlEngine *, QJSEngine *) {
@@ -93,10 +107,19 @@ public:
   void setKeepScreenOn(bool on);
   static bool keepScreenOnSupported() noexcept;
 
-  // Remote Admin (RemoteAdmin) config, from the bundled config -- empty
-  // password means the server never starts listening, see remoteadmin.cpp.
-  QString remoteAdminPassword() const { return bundledValue("REMOTE_ADMIN_PASSWORD"); }
-  int remoteAdminPort() const { return bundledInt("REMOTE_ADMIN_PORT", 2323); }
+  // Remote Admin (RemoteAdmin) config: the bundled REMOTE_ADMIN_* keys,
+  // overridden by values saved at setup. The server only listens while
+  // enabled with a non-empty password, see remoteadmin.cpp. Enabled by default
+  // exactly when the bundle has a password.
+  bool remoteAdminEnabled() const;
+  QString remoteAdminPassword() const;
+  int remoteAdminPort() const;
+  // Saves all three at once; remoteAdminConfigChanged() restarts the server.
+  Q_INVOKABLE void setRemoteAdminConfig(bool enabled, const QString &password,
+                                        int port);
+
+  bool setupCompleted() const;
+  void setSetupCompleted(bool completed);
 
   // MqttPublisher config -- empty host means it never connects, same gating
   // pattern as remoteAdminPassword() above. See mqttpublisher.cpp. Resolved
@@ -124,9 +147,12 @@ public:
   // non-loopback interface's hardware address, or a locally-administered
   // placeholder if none is found (sandboxed/virtual environment).
   QString deviceId() const;
-  // The machine's host name, or "qthomeassistant" if it has none. RemoteAdmin
-  // reports it as deviceInfo's deviceName.
+  // The name saved at setup, else the machine's host name, or
+  // "qthomeassistant" if it has none.
   QString deviceName() const;
+  void setDeviceName(const QString &name);
+  // What deviceName falls back to when none is saved.
+  Q_INVOKABLE QString hostName() const;
   // Non-loopback IPv4 addresses, in interface order.
   QStringList ipAddresses() const;
   // The first of ipAddresses(), or 127.0.0.1 -- RemoteAdmin's deviceInfo ip4.
@@ -150,6 +176,9 @@ signals:
   void keepScreenOnChanged();
   void mqttConfigChanged();
   void mqttConnectedChanged();
+  void setupCompletedChanged();
+  void deviceNameChanged();
+  void remoteAdminConfigChanged();
 
   void requestDetails(QString entity_id, QString friendly_name);
   void configurationChanged(QVariant configuration);

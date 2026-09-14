@@ -85,6 +85,13 @@ Page {
                 inputMethodHints: Qt.ImhSensitiveData | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
             }
 
+            Button {
+                Layout.fillWidth: true
+                text: qsTr("Log in again and set up this device...")
+                flat: true
+                onClicked: Controler.setupCompleted = false
+            }
+
             RowLayout {
                 Layout.fillWidth: true
 

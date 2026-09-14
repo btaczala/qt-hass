@@ -135,6 +135,12 @@ qt_add_qml_module(
   qml/Energy/Details/BatteryDetail.qml
   qml/Energy/Details/HomeDetail.qml
   qml/Settings/SettingsPage.qml
+  qml/Setup/ErrorLabel.qml
+  qml/Setup/HassAuth.qml
+  qml/Setup/LoginStep.qml
+  qml/Setup/OptionsStep.qml
+  qml/Setup/ServerStep.qml
+  qml/Setup/SetupWizard.qml
   qml/Settings/UiSettings.qml
   RESOURCES
   fonts/materialdesignicons-webfont.ttf

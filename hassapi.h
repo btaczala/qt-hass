@@ -63,6 +63,8 @@ public slots:
 signals:
   void error(QString);
   void connectedChanged();
+  // HA rejected the token (auth_invalid); retries continue regardless.
+  void authenticationFailed(QString message);
 
 private:
   // Forgets everything tied to the current connection, emitting

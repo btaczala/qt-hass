@@ -49,21 +49,30 @@ Popup {
         onTriggered: entity.snoozed = false
     }
 
+    // Sized to fit short landscape screens too: the gif shrinks (never
+    // grows past its own size) to leave room for the clock and the button.
     Column {
+        id: column
         anchors.centerIn: parent
-        spacing: 24
+        spacing: 16
 
         Clock {
+            id: clock
             anchors.horizontalCenter: parent.horizontalCenter
-            size: Math.min(root.width, root.height) * 0.6
+            size: Math.min(root.width * 0.6, root.height * 0.5)
         }
         AnimatedImage {
+            id: gif
+            readonly property real room: root.height - clock.height - snoozeButton.height - 2 * column.spacing - 32
             anchors.horizontalCenter: parent.horizontalCenter
+            height: Math.max(0, Math.min(gif.implicitHeight, gif.room))
+            width: gif.implicitHeight > 0 ? gif.height * gif.implicitWidth / gif.implicitHeight : 0
             source: "qrc:/res/QtHomeAssistant/images/screensaver.gif"
             fillMode: Image.PreserveAspectFit
             playing: root.visible
         }
         Button {
+            id: snoozeButton
             anchors.horizontalCenter: parent.horizontalCenter
             Material.theme: Material.Dark
             flat: true
