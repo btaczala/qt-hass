@@ -11,8 +11,7 @@ import QtHomeAssistant
 // A power flow diagram in the style of power-flow-card-plus
 // (github.com/flixlix/power-flow-card-plus): solar on top, grid on the left,
 // battery on the right, home at the bottom, joined by lines with dots moving
-// along every route power is taking. Tapping home fades in the individual
-// consumers below it.
+// along every route power is taking. Tapping a circle asks for its details.
 //
 // Inputs are the same few instantaneous readings HA's energy sensors give; the
 // per-route flows are derived from them the same way that card does -- export
@@ -27,15 +26,9 @@ Pane {
     property real gridPower: 0
     property real batteryPower: 0
     property real batterySoc: 0
-    property real evPower: 0
-    property real heatPumpPower: 0
 
-    // Whether the individual consumers below home are shown; toggled by
-    // tapping home.
-    property bool consumersVisible: false
-
-    // Tapping solar, grid or battery asks for that node's details; `node` is
-    // "solar", "grid" or "battery".
+    // Tapping a circle asks for its details; `node` is "solar", "grid",
+    // "battery" or "home".
     signal detailsRequested(string node)
 
     // power-flow-card-plus / HA energy dashboard default colors.
@@ -44,8 +37,6 @@ Pane {
     property color gridExportColor: "#8353d1"
     property color batteryChargeColor: "#f06292"
     property color batteryDischargeColor: "#4db6ac"
-    property color evColor: "#9ccc65"
-    property color heatPumpColor: "#ef5350"
     property color idleColor: Qt.rgba(root.Material.foreground.r, root.Material.foreground.g, root.Material.foreground.b, 0.2)
 
     readonly property real gridImport: Math.max(0, root.gridPower)
@@ -62,30 +53,14 @@ Pane {
     readonly property real gridToHome: Math.max(0, root.gridImport - root.gridToBattery)
     readonly property real homePower: root.solarToHome + root.batteryToHome + root.gridToHome
 
-    readonly property real maxFlow: Math.max(root.solarToHome, root.solarToGrid, root.solarToBattery, root.gridToHome, root.batteryToHome, root.gridToBattery, root.batteryToGrid, root.evPower, root.heatPumpPower)
+    readonly property real maxFlow: Math.max(root.solarToHome, root.solarToGrid, root.solarToBattery, root.gridToHome, root.batteryToHome, root.gridToBattery, root.batteryToGrid)
 
     // The diagram is laid out in these fixed units, then drawn at
-    // diagramScale. The card sizes itself to the diagram: collapsedHeight
-    // without the consumers row, expandedHeight with it, animating between
-    // the two as the row fades. diagramScale is picked (by PageEnergy.qml) to
-    // fit collapsedHeight, so the default view isn't shrunk to make room for
-    // a row that's hidden most of the time; on screens too short for the
-    // expanded height too, the consumers row simply clips instead of
-    // rescaling the whole diagram down.
+    // diagramScale; the card sizes itself to the scaled diagram.
     readonly property real designWidth: 580
-    readonly property real collapsedHeight: 520
-    readonly property real expandedHeight: 670
+    readonly property real designHeight: 520
     property real diagramScale: 1
 
-    // Current height of the visible part of the diagram, in design units.
-    property real shownHeight: root.consumersVisible ? root.expandedHeight : root.collapsedHeight
-
-    Behavior on shownHeight {
-        NumberAnimation {
-            duration: 250
-            easing.type: Easing.InOutQuad
-        }
-    }
     // How far off-center lines that share a circle side attach.
     readonly property real attachOffset: 14
 
@@ -126,7 +101,7 @@ Pane {
     Material.roundedScale: Material.MediumScale
 
     contentWidth: root.designWidth * root.diagramScale
-    contentHeight: root.shownHeight * root.diagramScale
+    contentHeight: root.designHeight * root.diagramScale
 
     // A value row inside a node: a direction arrow (optional) and a power.
     component FlowValue: RowLayout {
@@ -152,16 +127,13 @@ Pane {
         }
     }
 
-    // Clips the diagram to the card's current height, so the consumers row
-    // doesn't spill below the card while it collapses.
     Item {
         anchors.fill: parent
-        clip: true
 
         Item {
             id: diagram
             width: root.designWidth
-            height: root.expandedHeight
+            height: root.designHeight
             scale: root.diagramScale
             transformOrigin: Item.TopLeft
 
@@ -272,7 +244,7 @@ Pane {
                 icon: "mdi:home"
                 outlined: false
                 clickable: true
-                onClicked: root.consumersVisible = !root.consumersVisible
+                onClicked: root.detailsRequested("home")
 
                 FlowValue {
                     watts: root.homePower
@@ -359,74 +331,6 @@ Pane {
                     icon: "mdi:arrow-up"
                     watts: root.batteryDischarge
                     color: root.batteryDischargeColor
-                }
-            }
-
-            // Individual consumers, below home. Invisible once faded out, which
-            // also stops their lines' dot animations.
-            Item {
-                id: consumers
-                anchors.fill: parent
-                opacity: root.consumersVisible ? 1 : 0
-                visible: opacity > 0
-
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 250
-                        easing.type: Easing.InOutQuad
-                    }
-                }
-
-                // They leave home from its lower sides, clear of its caption.
-                readonly property real homeAttachOffset: 28
-
-                EnergyFlowLine {
-                    anchors.fill: parent
-                    from: root.leftOf(home, consumers.homeAttachOffset)
-                    to: root.topOf(ev, 0)
-                    control: Qt.point(to.x, from.y)
-                    power: root.evPower
-                    maxPower: root.maxFlow
-                    color: root.evColor
-                    idleColor: root.idleColor
-                }
-                EnergyFlowLine {
-                    anchors.fill: parent
-                    from: root.rightOf(home, consumers.homeAttachOffset)
-                    to: root.topOf(heatPump, 0)
-                    control: Qt.point(to.x, from.y)
-                    power: root.heatPumpPower
-                    maxPower: root.maxFlow
-                    color: root.heatPumpColor
-                    idleColor: root.idleColor
-                }
-
-                EnergyNode {
-                    id: ev
-                    centerX: 150
-                    centerY: 590
-                    labelBelow: true
-                    label: qsTr("Car")
-                    icon: "mdi:car-electric"
-                    color: root.evColor
-
-                    FlowValue {
-                        watts: root.evPower
-                    }
-                }
-
-                EnergyNode {
-                    id: heatPump
-                    centerX: 430
-                    centerY: 590
-                    labelBelow: true
-                    label: qsTr("Heat pump")
-                    icon: "mdi:heat-pump"
-                    color: root.heatPumpColor
-
-                    FlowValue {
-                        watts: root.heatPumpPower
-                    }
                 }
             }
         }

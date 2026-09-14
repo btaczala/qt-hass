@@ -5,6 +5,7 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QObject>
+#include <QtCore/QPointer>
 #include <QtCore/QSet>
 #include <QtCore/QVariantMap>
 
@@ -50,6 +51,15 @@ public slots:
                    const QVariantMap &service_data = {});
   void light(QString entity_id, bool on);
 
+  // Sends a one-off WebSocket API command, e.g.
+  // command("recorder/statistics_during_period", {...}, this, fn), and calls
+  // fn(ok, resultJson) with the reply's `result` as a JSON string. The reply
+  // is dropped if `owner` is destroyed first or the connection goes down
+  // before it arrives, so pass the calling QML object as `owner`. Returns
+  // false (and never calls back) when not connected.
+  bool command(const QString &type, const QVariantMap &params, QObject *owner,
+               QJSValue callback);
+
 signals:
   void error(QString);
   void connectedChanged();
@@ -93,6 +103,11 @@ private:
   // Latest full state per entity, rebuilt from HA's compressed diffs.
   QMap<QString, QJsonObject> entity_states_;
   QSet<QString> subscribed_entities_;
+  struct PendingCommand {
+    QPointer<QObject> owner;
+    QJSValue callback;
+  };
+  QHash<int, PendingCommand> pending_commands_;
   int request_id{1};
 };
 

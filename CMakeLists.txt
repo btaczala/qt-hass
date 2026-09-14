@@ -106,12 +106,15 @@ qt_add_qml_module(
   qml/Main.qml
   qml/AnimatedBackground.qml
   qml/EntityBase.qml
+  qml/HassEntity.qml
   qml/Light.qml
   qml/Tile.qml
   qml/TileFeature.qml
   qml/MdiIcon.qml
   qml/IconImage.qml
   qml/Screensaver.qml
+  qml/Clock.qml
+  qml/DoNotDisturb.qml
   qml/Cards/Weather.qml
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
@@ -121,7 +124,7 @@ qt_add_qml_module(
   qml/Energy/EnergyFlowCard.qml
   qml/Energy/EnergyFlowLine.qml
   qml/Energy/EnergyNode.qml
-  qml/Energy/FakeEnergySource.qml
+  qml/Energy/HassEnergySource.qml
   qml/Energy/Details/EnergyDetailPopup.qml
   qml/Energy/Details/EnergyChartView.qml
   qml/Energy/Details/EnergyValueAxis.qml
@@ -130,6 +133,7 @@ qt_add_qml_module(
   qml/Energy/Details/SolarDetail.qml
   qml/Energy/Details/GridDetail.qml
   qml/Energy/Details/BatteryDetail.qml
+  qml/Energy/Details/HomeDetail.qml
   qml/Settings/SettingsPage.qml
   qml/Settings/UiSettings.qml
   RESOURCES

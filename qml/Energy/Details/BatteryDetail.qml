@@ -25,9 +25,12 @@ ColumnLayout {
     property real absoluteHour: 0
     // [{x: absolute hour, y: SoC}] over the last week.
     property var history: []
-    // Today's solar forecast [{x: hour, y: W}], evenly spaced, and typical
-    // home consumption [{x: hour, y: W}], one point per hour.
+    // Today's solar forecast [{x: hour, y: W}], evenly spaced, optionally with
+    // its 10th and 90th percentiles on the same x values, and typical home
+    // consumption [{x: hour, y: W}], one point per hour.
     property var solarForecast: []
+    property var solarForecastLow: []
+    property var solarForecastHigh: []
     property var loadProfile: []
     property color chargeColor: "#f06292"
     property color dischargeColor: "#4db6ac"
@@ -48,12 +51,12 @@ ColumnLayout {
 
     // Solar left over after the home's typical consumption for the rest of
     // today, as much as the battery can take per interval, in Wh.
-    readonly property real expectedSurplus: {
-        if (root.solarForecast.length < 2)
+    function surplusOf(forecast: var): real {
+        if (forecast.length < 2)
             return 0;
-        const interval = root.solarForecast[1].x - root.solarForecast[0].x;
+        const interval = forecast[1].x - forecast[0].x;
         let sum = 0;
-        for (const p of root.solarForecast) {
+        for (const p of forecast) {
             if (p.x < root.nowHour)
                 continue;
             const load = root.loadProfile[Math.min(root.loadProfile.length - 1, Math.floor(p.x))];
@@ -61,19 +64,24 @@ ColumnLayout {
         }
         return sum;
     }
+    readonly property real expectedSurplus: root.surplusOf(root.solarForecast)
+    readonly property real surplusLow: root.surplusOf(root.solarForecastLow)
+    readonly property real surplusHigh: root.surplusOf(root.solarForecastHigh)
     readonly property real energyToFull: (100 - root.soc) / 100 * root.capacity
 
-    // Chance of reaching full today: the expected surplus is taken to be off
-    // by a normally distributed error of 30 % (a typical day-ahead solar
-    // forecast miss), and this is the probability it still covers what's
-    // missing.
+    // Chance of reaching full today: the surplus is taken to be normally
+    // distributed, and this is the probability it covers what's missing. With
+    // forecast percentiles its spread comes from the surplus at the 10th and
+    // 90th (±1.28 standard deviations -- treating every interval as missing
+    // the same way, as the forecast's own daily percentiles do); without,
+    // from a 30 % error, a typical day-ahead solar forecast miss.
     readonly property real fullProbability: {
         if (root.soc >= 99)
             return 1;
-        if (root.expectedSurplus <= 0)
-            return 0;
-        const z = (root.expectedSurplus - root.energyToFull) / (0.3 * root.expectedSurplus);
-        return root.normalCdf(z);
+        const spread = root.solarForecastLow.length > 0 && root.solarForecastHigh.length > 0 ? (root.surplusHigh - root.surplusLow) / 2.563 : 0.3 * root.expectedSurplus;
+        if (spread <= 0)
+            return root.expectedSurplus >= root.energyToFull ? 1 : 0;
+        return root.normalCdf((root.expectedSurplus - root.energyToFull) / spread);
     }
 
     // Abramowitz & Stegun 7.1.26.
@@ -294,11 +302,11 @@ ColumnLayout {
     // would see as every point changing; rebuilding is no dearer.
     onHistoryChanged: {
         socSeries.clear();
-        chart.setPoints(socSeries, root.history, false, 1);
+        chart.setPoints(socSeries, root.history, 1);
     }
     onTodayChanged: root.fillDayAxis()
     Component.onCompleted: {
         root.fillDayAxis();
-        chart.setPoints(socSeries, root.history, false, 1);
+        chart.setPoints(socSeries, root.history, 1);
     }
 }

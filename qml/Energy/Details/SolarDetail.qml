@@ -7,8 +7,8 @@ import QtHomeAssistant
 
 import "EnergyFormat.js" as EnergyFormat
 
-// Solar overlay: production now and today, and today's actual production
-// charted against the forecast.
+// Solar overlay: production now and today, a bar of today's production
+// against the forecast, and today's actual production charted against it.
 ColumnLayout {
     id: root
 
@@ -91,12 +91,84 @@ ColumnLayout {
         }
     }
 
+    // Today's production on a scale of the day's forecast: what's produced so
+    // far, in a red-orange-green gradient spanning the whole bar (so the
+    // color at its end shows how far along the forecast the day is), then
+    // what's still expected, and a tick where the forecast says production
+    // should be by now.
+    Item {
+        id: progress
+        Layout.fillWidth: true
+        implicitHeight: 14
+
+        readonly property real total: Math.max(1, root.forecastTotal, root.producedEnergy + root.forecastRemaining)
+        readonly property real producedFraction: Math.min(1, root.producedEnergy / progress.total)
+        readonly property real expectedFraction: Math.min(1 - progress.producedFraction, root.forecastRemaining / progress.total)
+        readonly property color trackColor: Qt.rgba(root.Material.foreground.r, root.Material.foreground.g, root.Material.foreground.b, 0.1)
+
+        Accessible.role: Accessible.ProgressBar
+        Accessible.name: qsTr("Produced %1 of %2 forecast, %3 still expected").arg(EnergyFormat.energy(root.producedEnergy)).arg(EnergyFormat.energy(root.forecastTotal)).arg(EnergyFormat.energy(root.forecastRemaining))
+
+        Rectangle {
+            anchors.fill: parent
+            radius: height / 2
+            color: progress.trackColor
+        }
+        // Starts under the produced part's end, so its rounded left edge
+        // doesn't show.
+        Rectangle {
+            x: Math.max(0, progress.width * progress.producedFraction - progress.height)
+            width: progress.width * (progress.producedFraction + progress.expectedFraction) - x
+            height: progress.height
+            radius: height / 2
+            visible: progress.expectedFraction > 0
+            color: progress.trackColor
+            border.width: 1
+            border.color: Qt.rgba(root.Material.foreground.r, root.Material.foreground.g, root.Material.foreground.b, 0.25)
+        }
+        Item {
+            width: progress.width * progress.producedFraction
+            height: progress.height
+            clip: true
+
+            Rectangle {
+                width: progress.width
+                height: progress.height
+                radius: height / 2
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+                    GradientStop {
+                        position: 0
+                        color: "#e53935"
+                    }
+                    GradientStop {
+                        position: 0.5
+                        color: "#fb8c00"
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "#43a047"
+                    }
+                }
+            }
+        }
+        Rectangle {
+            visible: root.forecastSoFar > 0
+            x: progress.width * Math.min(1, root.forecastSoFar / progress.total) - width / 2
+            y: -3
+            width: 2
+            height: progress.height + 6
+            color: root.Material.foreground
+        }
+    }
+
     EnergyChartView {
         id: chart
         Layout.fillWidth: true
         Layout.fillHeight: true
 
-        markerAxis: solarX
+        xMin: solarX.min
+        xMax: solarX.max
         nowX: root.nowHour
 
         // Charted in kW.
@@ -143,10 +215,10 @@ ColumnLayout {
         }
     }
 
-    onForecastChanged: chart.setPoints(forecastSeries, root.forecast, false, 0.001)
-    onActualChanged: chart.setPoints(actualSeries, root.actual, false, 0.001)
+    onForecastChanged: chart.setPoints(forecastSeries, root.forecast, 0.001)
+    onActualChanged: chart.setPoints(actualSeries, root.actual, 0.001)
     Component.onCompleted: {
-        chart.setPoints(forecastSeries, root.forecast, false, 0.001);
-        chart.setPoints(actualSeries, root.actual, false, 0.001);
+        chart.setPoints(forecastSeries, root.forecast, 0.001);
+        chart.setPoints(actualSeries, root.actual, 0.001);
     }
 }

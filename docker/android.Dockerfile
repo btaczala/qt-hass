@@ -11,7 +11,12 @@
 # The app source is bind-mounted in at `docker run` time (see the justfile's
 # android-build recipe) -- rebuilding this image is only needed when the
 # toolchain itself changes, not on every app source edit.
-FROM ubuntu:24.04
+# linux/amd64 even on an Apple Silicon host (run under Docker Desktop's
+# emulation): the NDK and aqt's Linux Qt kits (including the gcc_64 host kit's
+# moc/rcc/qmlcachegen) only ship x86_64 binaries, and JAVA_HOME below is the
+# amd64 JDK path. Left to default, Docker picks linux/arm64 there and
+# sdkmanager fails straight away on the nonexistent JAVA_HOME.
+FROM --platform=linux/amd64 ubuntu:24.04
 
 ARG QT_VERSION=6.10.1
 ARG NDK_VERSION=27.3.13750724

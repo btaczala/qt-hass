@@ -83,9 +83,27 @@ HassAPI::HassAPI(QObject *parent)
   message_handlers_["pong"] = [this](QJsonDocument) { awaiting_pong_ = false; };
 
   message_handlers_["result"] = [this](QJsonDocument payload) {
-    if (!payload["success"].toBool(true))
+    const bool success = payload["success"].toBool(true);
+    if (!success)
       qCWarning(hassAPI) << "Request" << payload["id"].toInt()
                          << "failed:" << payload["error"]["message"].toString();
+
+    const auto pending = pending_commands_.find(payload["id"].toInt());
+    if (pending == pending_commands_.end())
+      return;
+    const PendingCommand command = pending.value();
+    pending_commands_.erase(pending);
+    if (!command.owner || !command.callback.isCallable())
+      return;
+
+    const QJsonValue result = payload["result"];
+    const QString serialized =
+        result.isObject()  ? QJsonDocument{result.toObject()}.toJson(QJsonDocument::Compact)
+        : result.isArray() ? QJsonDocument{result.toArray()}.toJson(QJsonDocument::Compact)
+                           : QStringLiteral("null");
+    if (const QJSValue ret = QJSValue{command.callback}.call({success, serialized});
+        ret.isError())
+      qCCritical(hassAPI) << "Command callback threw:" << ret.toString();
   };
   message_handlers_["event"] = [this](QJsonDocument payload) {
     eventHandler(payload);
@@ -172,6 +190,7 @@ void HassAPI::resetSession() {
   awaiting_pong_ = false;
   subscribed_entities_.clear();
   entity_states_.clear();
+  pending_commands_.clear();
   if (connected_) {
     connected_ = false;
     emit connectedChanged();
@@ -366,6 +385,21 @@ void HassAPI::callService(const QString &domain, const QString &service,
     request["service_data"] = QJsonObject::fromVariantMap(service_data);
 
   socket_->sendTextMessage(QJsonDocument{request}.toJson());
+}
+
+bool HassAPI::command(const QString &type, const QVariantMap &params,
+                      QObject *owner, QJSValue callback) {
+  if (!connected_) {
+    qCWarning(hassAPI) << "Not connected, dropping command" << type;
+    return false;
+  }
+  QJsonObject request = QJsonObject::fromVariantMap(params);
+  const int id = request_id++;
+  request["id"] = id;
+  request["type"] = type;
+  pending_commands_.insert(id, {owner, callback});
+  socket_->sendTextMessage(QJsonDocument{request}.toJson(QJsonDocument::Compact));
+  return true;
 }
 
 void HassAPI::light(QString entity_id, bool on) {

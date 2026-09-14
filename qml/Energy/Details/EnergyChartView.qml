@@ -4,12 +4,16 @@ import QtCharts
 
 // A ChartView styled for the energy detail overlays: see-through, Material
 // text colors, legend on top, and an optional "now" marker. Declare axes
-// (EnergyValueAxis) and series inside it and fill the series with setPoints().
+// (EnergyValueAxis) and series inside it and fill line series with
+// setPoints(); items declared inside it can be placed with plotX().
 ChartView {
     id: root
 
-    // The x axis the "now" marker is placed along, and where; NaN hides it.
-    property ValueAxis markerAxis
+    // The x range across the plot area that the "now" marker and plotX() use
+    // -- the x axis's range, or 0..24 for hourly bars -- and where "now" is;
+    // NaN hides the marker.
+    property real xMin: 0
+    property real xMax: 24
     property real nowX: NaN
 
     readonly property color axisTextColor: root.Material.hintTextColor
@@ -26,42 +30,26 @@ ChartView {
     }
 
     // Makes `series` show `points` ([{x, y}]), with y multiplied by `scale`.
-    // With `step`, each y holds until the next point's x (the last one for as
-    // long as the spacing before it). Only changed points are touched, so a
-    // series that just grows at the end stays cheap to update -- except step
-    // series, which are rebuilt on any change: their doubled-up points aren't
-    // unique, and replace() matches points by value.
-    function setPoints(series: LineSeries, points: var, step: bool, scale: real) {
-        const target = [];
-        for (let i = 0; i < points.length; ++i) {
+    // Only changed points are touched, so a series that just grows at the end
+    // stays cheap to update. replace() matches points by value, which is safe
+    // because x only ever increases along a series.
+    function setPoints(series: LineSeries, points: var, scale: real) {
+        const shared = Math.min(series.count, points.length);
+        for (let i = 0; i < shared; ++i) {
+            const old = series.at(i);
             const y = points[i].y * scale;
-            target.push(Qt.point(points[i].x, y));
-            if (step) {
-                const spacing = i > 0 ? points[i].x - points[i - 1].x : 1;
-                target.push(Qt.point(i + 1 < points.length ? points[i + 1].x : points[i].x + spacing, y));
-            }
+            if (old.x !== points[i].x || old.y !== y)
+                series.replace(old.x, old.y, points[i].x, y);
         }
+        if (series.count > points.length)
+            series.removePoints(points.length, series.count - points.length);
+        for (let i = shared; i < points.length; ++i)
+            series.append(points[i].x, points[i].y * scale);
+    }
 
-        let shared = Math.min(series.count, target.length);
-        if (step) {
-            for (let i = 0; i < shared; ++i) {
-                const old = series.at(i);
-                if (old.x !== target[i].x || old.y !== target[i].y) {
-                    shared = 0;
-                    break;
-                }
-            }
-        } else {
-            for (let i = 0; i < shared; ++i) {
-                const old = series.at(i);
-                if (old.x !== target[i].x || old.y !== target[i].y)
-                    series.replace(old.x, old.y, target[i].x, target[i].y);
-            }
-        }
-        if (series.count > shared)
-            series.removePoints(shared, series.count - shared);
-        for (let i = shared; i < target.length; ++i)
-            series.append(target[i].x, target[i].y);
+    // Plot-area x for `value` on the xMin..xMax range.
+    function plotX(value: real): real {
+        return root.plotArea.x + root.plotArea.width * (value - root.xMin) / (root.xMax - root.xMin);
     }
 
     backgroundColor: "transparent"
@@ -76,8 +64,8 @@ ChartView {
     legend.font.pixelSize: 12
 
     Rectangle {
-        visible: root.markerAxis !== null && !isNaN(root.nowX) && root.nowX >= root.markerAxis.min && root.nowX <= root.markerAxis.max
-        x: root.markerAxis ? root.plotArea.x + root.plotArea.width * (root.nowX - root.markerAxis.min) / (root.markerAxis.max - root.markerAxis.min) : 0
+        visible: !isNaN(root.nowX) && root.nowX >= root.xMin && root.nowX <= root.xMax
+        x: root.plotX(root.nowX)
         y: root.plotArea.y
         width: 1
         height: root.plotArea.height

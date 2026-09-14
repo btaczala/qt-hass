@@ -24,7 +24,7 @@ android-image variant:
       qt610) qt=6.10.1; ndk=27.3.13750724 ;;
       *) echo "variant must be qt67 or qt610, got '{{ variant }}'" >&2; exit 1 ;;
     esac
-    docker build -f docker/android.Dockerfile \
+    docker build --platform linux/amd64 -f docker/android.Dockerfile \
       --build-arg QT_VERSION="$qt" \
       --build-arg NDK_VERSION="$ndk" \
       -t {{ image_tag }}:{{ variant }} \
@@ -42,7 +42,8 @@ android-build variant: (android-image variant)
     # androiddeployqt's underlying Gradle build only downloads its
     # distribution/AGP/dependencies once across runs, not on every
     # `docker run`.
-    docker run --rm \
+    # --platform matches the image (see docker/android.Dockerfile's FROM).
+    docker run --rm --platform linux/amd64 \
       -v "{{ justfile_directory() }}":/workspace \
       -v {{ gradle_cache_volume }}:/root/.gradle \
       -w /workspace \

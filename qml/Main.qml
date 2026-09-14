@@ -10,7 +10,7 @@ ApplicationWindow {
     width: 1024
     height: 800
     visible: true
-    title: qsTr("Hello World")
+    title: qsTr("Qt Home Assistant")
     visibility: platform == "android" ? Window.FullScreen : Window.Windowed // qmllint disable unqualified
 
     Material.theme: uiSettings.theme
@@ -69,14 +69,14 @@ ApplicationWindow {
         visible: Controler.screensaverActive
     }
 
+    DoNotDisturb {
+        entityId: "input_boolean.bartek_nie_przeszkadac"
+    }
+
     Component.onCompleted: {
         HassAPI.connect();
     }
 
-    // Mirrors HassAPI.connected onto Controler.hassConnected -- RemoteAdmin
-    // (C++) needs this for the deviceInfo command, but has no reliable way
-    // to reach the live HassAPI singleton itself, so it reads through
-    // Controler instead. See controller.h.
     Connections {
         target: HassAPI
         function onConnectedChanged() {

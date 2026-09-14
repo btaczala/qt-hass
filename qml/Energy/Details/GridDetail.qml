@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
@@ -9,13 +11,14 @@ import QtHomeAssistant
 import "EnergyFormat.js" as EnergyFormat
 
 // Grid overlay: current flow and prices, today's energy and money both ways,
-// and today's import and export prices charted by hour.
+// the best hours still ahead to import and to export, and today's hourly
+// prices as bars with those hours highlighted.
 ColumnLayout {
     id: root
 
     // W, positive while importing.
     property real power: 0
-    // [{x: hour, y: price per kWh}], each holding until the next point.
+    // [{x: hour, y: price per kWh}], each for the hour starting at x.
     property var importPrices: []
     property var exportPrices: []
     property string currency
@@ -28,31 +31,114 @@ ColumnLayout {
     property color importColor: "#488fc2"
     property color exportColor: "#8353d1"
 
+    // How many of the remaining hours count as the best ones.
+    property int bestHourCount: 3
+
     function priceAt(prices: var, hour: real): var {
-        let current = null;
-        for (const p of prices)
-            if (p.x <= hour)
-                current = p;
-        return current;
+        return prices.find(p => hour >= p.x && hour < p.x + 1) ?? null;
     }
-    // The cheapest or dearest price entry, `sign` 1 for dearest.
-    function extreme(prices: var, sign: int): var {
-        let best = null;
+
+    // Prices by hour of the day, 0 where missing, for the bar sets.
+    function hourly(prices: var): var {
+        const values = new Array(24).fill(0);
         for (const p of prices)
-            if (!best || sign * p.y > sign * best.y)
-                best = p;
-        return best;
+            if (p.x >= 0 && p.x < 24)
+                values[Math.floor(p.x)] = p.y;
+        return values;
     }
-    function slot(p: var): string {
-        return p ? qsTr("%1–%2").arg(EnergyFormat.clock(p.x)).arg(EnergyFormat.clock(p.x + 1)) : "";
+
+    // The bestHourCount hours from the current one on with the lowest
+    // (`sign` -1) or highest (1) price, as [{x, y}] in time order.
+    function bestHours(prices: var, sign: int): var {
+        return prices.filter(p => p.x + 1 > root.nowHour).sort((a, b) => sign * (b.y - a.y)).slice(0, root.bestHourCount).sort((a, b) => a.x - b.x);
+    }
+
+    // Consecutive hours merged into ranges: [{from, to, average}].
+    function ranges(hours: var): var {
+        const result = [];
+        for (const h of hours) {
+            const last = result[result.length - 1];
+            if (last && last.to === h.x) {
+                last.average = (last.average * (last.to - last.from) + h.y) / (last.to - last.from + 1);
+                last.to += 1;
+            } else {
+                result.push({
+                    from: h.x,
+                    to: h.x + 1,
+                    average: h.y
+                });
+            }
+        }
+        return result;
     }
 
     readonly property var importNow: root.priceAt(root.importPrices, root.nowHour)
     readonly property var exportNow: root.priceAt(root.exportPrices, root.nowHour)
-    readonly property var cheapestImport: root.extreme(root.importPrices, -1)
-    readonly property var bestExport: root.extreme(root.exportPrices, 1)
+    readonly property var bestImportHours: root.bestHours(root.importPrices, -1)
+    readonly property var bestExportHours: root.bestHours(root.exportPrices, 1)
 
-    spacing: 16
+    // A price range as a small tinted pill, e.g. "13:00–15:00 · 1.11".
+    component TimeChip: Rectangle {
+        id: chip
+
+        property var range
+        property color tint
+
+        implicitWidth: chipLabel.implicitWidth + 16
+        implicitHeight: chipLabel.implicitHeight + 8
+        radius: height / 2
+        color: Qt.rgba(chip.tint.r, chip.tint.g, chip.tint.b, 0.2)
+        border.width: 1
+        border.color: chip.tint
+
+        Label {
+            id: chipLabel
+            anchors.centerIn: parent
+            text: qsTr("%1–%2 · %3").arg(EnergyFormat.clock(chip.range.from)).arg(EnergyFormat.clock(chip.range.to)).arg(chip.range.average.toFixed(2))
+            font.pixelSize: 12
+        }
+    }
+
+    // A caption and the chips for one direction's best hours.
+    component BestTimes: RowLayout {
+        id: best
+
+        property string label
+        property var hours: []
+        property color tint
+
+        spacing: 8
+
+        Label {
+            Layout.preferredWidth: 130
+            text: best.label
+            font.pixelSize: 13
+            color: root.Material.secondaryTextColor
+            elide: Text.ElideRight
+        }
+        Flow {
+            Layout.fillWidth: true
+            spacing: 6
+
+            Repeater {
+                model: root.ranges(best.hours)
+
+                delegate: TimeChip {
+                    required property var modelData
+                    range: modelData
+                    tint: best.tint
+                }
+            }
+            Label {
+                visible: best.hours.length === 0
+                text: qsTr("No hours left today")
+                font.pixelSize: 12
+                color: root.Material.hintTextColor
+            }
+        }
+    }
+
+    spacing: 12
 
     GridLayout {
         Layout.fillWidth: true
@@ -71,13 +157,6 @@ ColumnLayout {
         EnergyStat {
             Layout.fillWidth: true
             Layout.preferredWidth: 1
-            label: qsTr("Cheapest import")
-            value: root.cheapestImport ? EnergyFormat.price(root.cheapestImport.y, root.currency) : "—"
-            detail: root.slot(root.cheapestImport)
-        }
-        EnergyStat {
-            Layout.fillWidth: true
-            Layout.preferredWidth: 1
             label: qsTr("Imported today")
             value: EnergyFormat.energy(root.importedEnergy)
             detail: qsTr("Cost %1").arg(EnergyFormat.money(root.importCost, root.currency))
@@ -91,14 +170,25 @@ ColumnLayout {
             detail: qsTr("Earned %1").arg(EnergyFormat.money(root.exportRevenue, root.currency))
             color: root.exportColor
         }
+        EnergyStat {
+            Layout.fillWidth: true
+            Layout.preferredWidth: 1
+            label: qsTr("Net cost today")
+            value: EnergyFormat.money(root.importCost - root.exportRevenue, root.currency)
+        }
     }
 
-    Label {
+    BestTimes {
         Layout.fillWidth: true
-        text: root.bestExport ? qsTr("Best time to export: %1 at %2. Net cost today: %3.").arg(root.slot(root.bestExport)).arg(EnergyFormat.price(root.bestExport.y, root.currency)).arg(EnergyFormat.money(root.importCost - root.exportRevenue, root.currency)) : ""
-        wrapMode: Text.WordWrap
-        font.pixelSize: 13
-        color: root.Material.secondaryTextColor
+        label: qsTr("Cheapest to import")
+        hours: root.bestImportHours
+        tint: root.importColor
+    }
+    BestTimes {
+        Layout.fillWidth: true
+        label: qsTr("Best to export")
+        hours: root.bestExportHours
+        tint: root.exportColor
     }
 
     EnergyChartView {
@@ -106,22 +196,23 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.fillHeight: true
 
-        markerAxis: priceX
+        xMin: 0
+        xMax: 24
         nowX: root.nowHour
 
         readonly property real lowest: Math.min(0, ...root.importPrices.map(p => p.y), ...root.exportPrices.map(p => p.y))
         readonly property real highest: Math.max(0, ...root.importPrices.map(p => p.y), ...root.exportPrices.map(p => p.y))
         readonly property real yStep: chart.niceStep(chart.highest - chart.lowest)
 
-        EnergyValueAxis {
-            id: priceX
-            textColor: chart.axisTextColor
-            min: 0
-            max: 24
-            tickType: ValueAxis.TicksDynamic
-            tickAnchor: 0
-            tickInterval: 3
-            labelFormat: "%02.0f:00"
+        BarCategoryAxis {
+            id: hourAxis
+            categories: Array.from({
+                length: 24
+            }, (_, h) => String(h))
+            lineVisible: false
+            gridVisible: false
+            labelsColor: chart.axisTextColor
+            labelsFont.pixelSize: 10
         }
         EnergyValueAxis {
             id: priceY
@@ -132,31 +223,51 @@ ColumnLayout {
             labelFormat: "%.2f"
         }
 
-        AreaSeries {
-            name: qsTr("Import price (%1/kWh)").arg(root.currency)
-            axisX: priceX
+        BarSeries {
+            axisX: hourAxis
             axisY: priceY
-            color: Qt.rgba(root.importColor.r, root.importColor.g, root.importColor.b, 0.2)
-            borderColor: root.importColor
-            borderWidth: 2
-            upperSeries: LineSeries {
-                id: importSeries
+            barWidth: 0.8
+
+            BarSet {
+                label: qsTr("Import price (%1/kWh)").arg(root.currency)
+                color: root.importColor
+                borderColor: "transparent"
+                values: root.hourly(root.importPrices)
+            }
+            BarSet {
+                label: qsTr("Export price (%1/kWh)").arg(root.currency)
+                color: root.exportColor
+                borderColor: "transparent"
+                values: root.hourly(root.exportPrices)
             }
         }
-        LineSeries {
-            id: exportSeries
-            name: qsTr("Export price (%1/kWh)").arg(root.currency)
-            axisX: priceX
-            axisY: priceY
-            color: root.exportColor
-            width: 2
-        }
-    }
 
-    onImportPricesChanged: chart.setPoints(importSeries, root.importPrices, true, 1)
-    onExportPricesChanged: chart.setPoints(exportSeries, root.exportPrices, true, 1)
-    Component.onCompleted: {
-        chart.setPoints(importSeries, root.importPrices, true, 1);
-        chart.setPoints(exportSeries, root.exportPrices, true, 1);
+        // Bands over the best hours ahead, faint since they draw over the
+        // bars: import on the plot's lower half, export on its upper half, so
+        // an hour that's both stays readable.
+        Repeater {
+            model: root.bestImportHours
+
+            delegate: Rectangle {
+                required property var modelData
+                x: chart.plotX(modelData.x)
+                y: chart.plotArea.y + chart.plotArea.height / 2
+                width: chart.plotArea.width / 24
+                height: chart.plotArea.height / 2
+                color: Qt.rgba(root.importColor.r, root.importColor.g, root.importColor.b, 0.18)
+            }
+        }
+        Repeater {
+            model: root.bestExportHours
+
+            delegate: Rectangle {
+                required property var modelData
+                x: chart.plotX(modelData.x)
+                y: chart.plotArea.y
+                width: chart.plotArea.width / 24
+                height: chart.plotArea.height / 2
+                color: Qt.rgba(root.exportColor.r, root.exportColor.g, root.exportColor.b, 0.18)
+            }
+        }
     }
 }
