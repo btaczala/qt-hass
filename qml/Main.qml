@@ -50,15 +50,21 @@ ApplicationWindow {
     }
 
     Loader {
+        id: dashboardLoader
         active: HassAPI.connected && Controler.setupCompleted
         anchors.fill: parent
         sourceComponent: Dashboard {
-            leadingInset: menuButton.width
+            // "auto": along the short side, so the pages keep the long one.
+            navPosition: uiSettings.navPosition !== "auto" ? uiSettings.navPosition : window.width > window.height ? "left" : "top"
+            onMenuRequested: drawer.open()
         }
     }
 
+    // The dashboard's navigation bar has its own settings button; this one is
+    // for while there's no dashboard, e.g. to fix a wrong URL.
     ToolButton {
         id: menuButton
+        visible: dashboardLoader.status !== Loader.Ready
         contentItem: MdiIcon {
             icon: "mdi:menu"
         }

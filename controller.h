@@ -49,7 +49,8 @@ class Controler : public QObject {
   // Set by MqttPublisher; always false without mqttSupported.
   Q_PROPERTY(bool mqttConnected READ mqttConnected NOTIFY mqttConnectedChanged)
   // Whether the first-run setup (qml/Setup/SetupWizard.qml) has been
-  // finished; saved to QSettings.
+  // finished; saved to QSettings. Until first saved, true exactly when a
+  // token was already configured at startup.
   Q_PROPERTY(bool setupCompleted READ setupCompleted WRITE setSetupCompleted
                  NOTIFY setupCompletedChanged)
   // Name this device goes by: RemoteAdmin's deviceInfo, the long-lived token
@@ -118,7 +119,7 @@ public:
   Q_INVOKABLE void setRemoteAdminConfig(bool enabled, const QString &password,
                                         int port);
 
-  bool setupCompleted() const;
+  bool setupCompleted() const noexcept { return setup_completed_; }
   void setSetupCompleted(bool completed);
 
   // MqttPublisher config -- empty host means it never connects, same gating
@@ -210,6 +211,7 @@ private:
   bool hass_connected_{false};
   bool mqtt_connected_{false};
   bool keep_screen_on_{false};
+  bool setup_completed_{false};
   int idle_timeout_seconds_{60};
   QTimer is_idle_timer_;
   QHash<QString, QString> bundled_config_;

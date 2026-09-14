@@ -116,8 +116,10 @@ qt_add_qml_module(
   qml/Clock.qml
   qml/DoNotDisturb.qml
   qml/Cards/Weather.qml
+  qml/Cards/ButtonCard.qml
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
+  qml/Features/ButtonsFeature.qml
   qml/Dashboard/Dashboard.qml
   qml/Dashboard/PageOverview.qml
   qml/Dashboard/PageEnergy.qml
@@ -134,6 +136,7 @@ qt_add_qml_module(
   qml/Energy/Details/GridDetail.qml
   qml/Energy/Details/BatteryDetail.qml
   qml/Energy/Details/HomeDetail.qml
+  qml/Navigation/NavBar.qml
   qml/Settings/SettingsPage.qml
   qml/Setup/ErrorLabel.qml
   qml/Setup/HassAuth.qml

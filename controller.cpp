@@ -67,6 +67,12 @@ Controler::Controler(QObject *parent)
   loadConnection();
   loadMqttConfig();
 
+  // Never saved: an install that already has a token (bundled, environment
+  // or saved from the settings page) is set up; only one without runs setup.
+  // Decided once here, since the wizard itself changes the token.
+  setup_completed_ =
+      QSettings{}.value(kSetupCompletedKey, !hass_token_.isEmpty()).toBool();
+
   keep_screen_on_ = QSettings{}.value(kKeepScreenOnKey, false).toBool();
   applyKeepScreenOn();
 }
@@ -330,13 +336,10 @@ void Controler::setDeviceName(const QString &name) {
     Q_EMIT deviceNameChanged();
 }
 
-bool Controler::setupCompleted() const {
-  return QSettings{}.value(kSetupCompletedKey, false).toBool();
-}
-
 void Controler::setSetupCompleted(bool completed) {
-  if (completed == setupCompleted())
+  if (completed == setup_completed_)
     return;
+  setup_completed_ = completed;
   QSettings{}.setValue(kSetupCompletedKey, completed);
   Q_EMIT setupCompletedChanged();
 }

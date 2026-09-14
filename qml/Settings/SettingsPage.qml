@@ -231,6 +231,29 @@ Page {
                 }
             }
 
+            RowLayout {
+                Layout.fillWidth: true
+
+                Label {
+                    Layout.fillWidth: true
+                    text: qsTr("Navigation bar")
+                }
+
+                ComboBox {
+                    textRole: "text"
+                    valueRole: "value"
+                    model: [
+                        { text: qsTr("Automatic"), value: "auto" },
+                        { text: qsTr("Left"), value: "left" },
+                        { text: qsTr("Right"), value: "right" },
+                        { text: qsTr("Top"), value: "top" },
+                        { text: qsTr("Bottom"), value: "bottom" }
+                    ]
+                    Component.onCompleted: currentIndex = indexOfValue(root.settings.navPosition)
+                    onActivated: root.settings.navPosition = currentValue
+                }
+            }
+
             Switch {
                 Layout.fillWidth: true
                 text: qsTr("Animated background")

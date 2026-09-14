@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 
-// Time and date in dim greys for dark full-screen overlays (Screensaver,
+// Time and date, by default in dim greys for dark full-screen overlays (Screensaver,
 // DoNotDisturb). Ticks only while visible; minutePassed() fires on each new
 // minute, e.g. to move the clock around.
 Column {
@@ -10,6 +10,9 @@ Column {
     // Scales the whole clock; the time is a fifth of this tall.
     property real size: 400
     property date now: new Date()
+    property color color: "#b0b0b0"
+    property color dateColor: "#808080"
+    property bool showDate: true
 
     signal minutePassed
 
@@ -25,13 +28,14 @@ Column {
         text: root.now.toLocaleTimeString(Qt.locale(), "HH:mm")
         font.pixelSize: root.size * 0.2
         font.weight: Font.Light
-        color: "#b0b0b0"
+        color: root.color
     }
     Label {
         anchors.horizontalCenter: parent.horizontalCenter
+        visible: root.showDate
         text: root.now.toLocaleDateString(Qt.locale(), "dddd, d MMMM")
         font.pixelSize: root.size * 0.05
-        color: "#808080"
+        color: root.dateColor
     }
 
     Timer {

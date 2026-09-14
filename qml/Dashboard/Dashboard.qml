@@ -1,41 +1,51 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
-import QtQuick.Controls.Material
 
 import QtHomeAssistant
 
-// Top-level shell: a TabBar-driven StackLayout. Each tab is its own sibling
-// .qml file in this directory. Add a page by dropping a new file next to this
-// one, adding it to QML_FILES in CMakeLists.txt, and adding both a TabButton
-// and the page itself below, in the same order.
-ColumnLayout {
+// Top-level shell: a NavBar docked to one edge over a StackLayout of pages.
+// Each page is its own sibling .qml file in this directory. Add a page by
+// dropping a new file next to this one, adding it to QML_FILES in
+// CMakeLists.txt, and adding both a `pages` entry and the page itself below,
+// in the same order.
+Item {
     id: root
-    spacing: 0
 
-    // Width of the space kept free at the TabBar's left end, where Main.qml's
-    // drawer button sits on top of it.
-    property real leadingInset: 0
+    // Where the navigation bar goes: "left", "right", "top" or "bottom".
+    property string navPosition: "left"
 
-    TabBar {
-        id: tabBar
-        Layout.fillWidth: true
-        // Padding, not a layout margin: the tabs move right, but the TabBar's
-        // background still spans the full width, behind the drawer button.
-        leftPadding: root.leadingInset
+    signal menuRequested
 
-        TabButton {
-            text: qsTr("Overview")
+    readonly property var pages: [
+        {
+            icon: "mdi:view-dashboard",
+            label: qsTr("Overview")
+        },
+        {
+            icon: "mdi:lightning-bolt",
+            label: qsTr("Energy")
         }
-        TabButton {
-            text: qsTr("Energy overview")
-        }
+    ]
+    readonly property real navMargin: 8
+
+    NavBar {
+        id: navBar
+        position: root.navPosition
+        items: root.pages
+        onMenuRequested: root.menuRequested()
+
+        // Centered along its edge.
+        x: root.navPosition === "left" ? root.navMargin : root.navPosition === "right" ? root.width - width - root.navMargin : (root.width - width) / 2
+        y: root.navPosition === "top" ? root.navMargin : root.navPosition === "bottom" ? root.height - height - root.navMargin : (root.height - height) / 2
     }
 
     StackLayout {
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        currentIndex: tabBar.currentIndex
+        anchors.fill: parent
+        anchors.leftMargin: root.navPosition === "left" ? navBar.width + root.navMargin : 0
+        anchors.rightMargin: root.navPosition === "right" ? navBar.width + root.navMargin : 0
+        anchors.topMargin: root.navPosition === "top" ? navBar.height + root.navMargin : 0
+        anchors.bottomMargin: root.navPosition === "bottom" ? navBar.height + root.navMargin : 0
+        currentIndex: navBar.currentIndex
 
         PageOverview {}
         PageEnergy {}

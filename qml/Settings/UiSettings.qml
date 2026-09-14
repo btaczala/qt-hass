@@ -8,4 +8,7 @@ Settings {
 
     property int theme: Material.Dark
     property bool animatedBackground: true
+    // Dashboard navigation bar edge: "auto" (left in landscape, top in
+    // portrait), "left", "right", "top" or "bottom".
+    property string navPosition: "auto"
 }

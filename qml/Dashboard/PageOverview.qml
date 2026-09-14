@@ -5,55 +5,179 @@ import QtQuick.Controls.Material
 
 import QtHomeAssistant
 
-Item {
-    RowLayout {
-        anchors.fill: parent
-        anchors.margins: 20
-        spacing: 5
-        Weather {
-            Layout.preferredWidth: 200
-            Layout.preferredHeight: 200
-            entity_id: 'weather.forecast_home'
+// The office panel's main view, after Home Assistant's nspanel-office /
+// nspanel-main dashboard: a clock over two columns of cards, stacked into one
+// when the window is narrow. Its "do not disturb" section is DoNotDisturb.qml,
+// shown over the whole app from Main.qml.
+Flickable {
+    id: root
+
+    readonly property real spacing: 8
+    readonly property color green: "#4caf50"
+    readonly property color blue: "#2196f3"
+    readonly property color orange: "#ff9800"
+    readonly property color red: "#f44336"
+
+    contentHeight: content.implicitHeight + 2 * content.y
+    clip: true
+    boundsBehavior: Flickable.StopAtBounds
+
+    ColumnLayout {
+        id: content
+
+        x: (root.width - width) / 2
+        y: 16
+        width: Math.min(root.width - 32, 960)
+        spacing: root.spacing
+
+        Clock {
+            Layout.alignment: Qt.AlignHCenter
+            size: 240
+            showDate: false
+            color: root.Material.foreground
         }
-        Light {
-            Layout.preferredWidth: 200
-            Layout.preferredHeight: 200
-            entity_id: "light.nspanel_office_relay_1"
-        }
-        Light {
-            Layout.preferredWidth: 200
-            Layout.preferredHeight: 200
-            entity_id: "light.ledy_biuro"
-        }
-        Light {
-            Layout.preferredWidth: 200
-            Layout.preferredHeight: 200
-            entity_id: "light.swiatla_na_zewnatrz"
-        }
-        ColumnLayout {
-            Layout.preferredWidth: 250
-            Layout.alignment: Qt.AlignTop
-            spacing: 5
-            Tile {
-                Layout.fillWidth: true
-                entity_id: "switch.home_assistant_voice_09674a_mute"
-                features: [
-                    ToggleFeature {},
-                    LightBrightnessFeature {}
-                ]
-            }
-            Tile {
-                Layout.fillWidth: true
-                entity_id: "light.swiatla_na_zewnatrz"
-                features: [
-                    ToggleFeature {},
-                    LightBrightnessFeature {}
-                ]
-            }
-        }
-        Item {
+
+        GridLayout {
             Layout.fillWidth: true
-            Layout.fillHeight: true
+            columns: content.width >= 640 ? 2 : 1
+            columnSpacing: 16
+            rowSpacing: root.spacing
+            uniformCellWidths: true
+
+            // Left column: routines, the vacuum, the front door and the alarm.
+            ColumnLayout {
+                Layout.fillWidth: true
+                // Layouts fill by default; the shorter column would stretch its tiles.
+                Layout.fillHeight: false
+                Layout.alignment: Qt.AlignTop
+                spacing: root.spacing
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: root.spacing
+                    uniformCellSizes: true
+
+                    ButtonCard {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 120
+                        entity_id: "script.dzien_dobry"
+                    }
+                    ButtonCard {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 120
+                        entity_id: "script.dobranoc"
+                    }
+                }
+
+                Tile {
+                    Layout.fillWidth: true
+                    entity_id: "vacuum.vaderek"
+                    features: [
+                        ButtonsFeature {
+                            outlined: true
+                            entries: [
+                                {
+                                    entity_id: "button.vaderek_shortcut_1",
+                                    icon: "mdi:vacuum",
+                                    label: "Odk"
+                                },
+                                {
+                                    entity_id: "button.vaderek_shortcut_3",
+                                    icon: "mdi:spray-bottle",
+                                    label: "O + M"
+                                }
+                            ]
+                        }
+                    ]
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: root.spacing
+                    uniformCellSizes: true
+
+                    Tile {
+                        id: frontDoor
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        entity_id: "lock.drzwi_wejsciowe"
+                        stateColor: frontDoor.isUnavailable ? frontDoor.Material.hintTextColor : frontDoor.entityState === "locked" ? root.green : root.red
+                    }
+                    Tile {
+                        id: alarm
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        entity_id: "alarm_control_panel.somfy_home_alarm_dom_bartek_taczala"
+                        name: qsTr("Alarm")
+                        stateColor: {
+                            if (alarm.isUnavailable)
+                                return alarm.Material.hintTextColor;
+                            if (alarm.entityState === "disarmed")
+                                return root.blue;
+                            if (alarm.entityState === "triggered")
+                                return root.red;
+                            if (["arming", "pending", "disarming"].includes(alarm.entityState))
+                                return root.orange;
+                            return root.green;
+                        }
+                    }
+                }
+            }
+
+            // Right column: the office itself.
+            ColumnLayout {
+                Layout.fillWidth: true
+                // Layouts fill by default; the shorter column would stretch its tiles.
+                Layout.fillHeight: false
+                Layout.alignment: Qt.AlignTop
+                spacing: root.spacing
+
+                Tile {
+                    id: occupancy
+                    Layout.fillWidth: true
+                    entity_id: "binary_sensor.zajetosc_biura"
+                    name: occupancy.isOn ? qsTr("Ojciec w biurze") : qsTr("Puste biuro")
+                    icon: occupancy.isOn ? "mdi:motion-sensor" : "mdi:motion-sensor-off"
+                    hideState: true
+                    stateColor: occupancy.isOn ? root.red : root.green
+                }
+
+                Tile {
+                    id: temperature
+                    readonly property bool cold: Number(temperature.entityState) < 22 || !temperature.isActive
+
+                    Layout.fillWidth: true
+                    entity_id: "sensor.ikea_vindstyrka_czujnik_temperatury_temperature"
+                    name: qsTr("%1 °C").arg(temperature.entityState)
+                    icon: "mdi:thermometer"
+                    stateDisplay: temperature.cold ? qsTr("Zimno") : qsTr("ok")
+                    stateColor: temperature.cold ? root.blue : root.green
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: root.spacing
+                    uniformCellSizes: true
+
+                    Tile {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        entity_id: "script.szybkie_grzanie_w_biurze"
+                        name: qsTr("grzanie")
+                        features: [
+                            ButtonsFeature {}
+                        ]
+                    }
+                    Tile {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        entity_id: "input_boolean.bartek_nie_przeszkadac"
+                        features: [
+                            ToggleFeature {}
+                        ]
+                    }
+                }
+            }
         }
     }
 }

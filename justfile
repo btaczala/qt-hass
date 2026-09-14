@@ -43,9 +43,17 @@ android-build variant: (android-image variant)
     # distribution/AGP/dependencies once across runs, not on every
     # `docker run`.
     # --platform matches the image (see docker/android.Dockerfile's FROM).
+    # The host's ~/.android is mounted so the debug signing key
+    # (debug.keystore, created there on first build if missing) outlives the
+    # container: with a fresh key per `docker run --rm`, every build would be
+    # signed differently and `adb install -r` would refuse to update the app
+    # (INSTALL_FAILED_UPDATE_INCOMPATIBLE) without uninstalling it -- and its
+    # data -- first. Same key as a host-native build uses, too.
+    mkdir -p "$HOME/.android"
     docker run --rm --platform linux/amd64 \
       -v "{{ justfile_directory() }}":/workspace \
       -v {{ gradle_cache_volume }}:/root/.gradle \
+      -v "$HOME/.android":/root/.android \
       -w /workspace \
       {{ image_tag }}:{{ variant }} bash -lc "
         set -euo pipefail

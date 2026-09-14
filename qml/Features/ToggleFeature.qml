@@ -14,7 +14,7 @@ TileFeature {
 
     // [off, on], matching the icons the tile itself uses for this domain.
     readonly property var icons: root.tile?.domainIcons[root.domain] ?? ["mdi:power-off", "mdi:power"]
-    readonly property bool isOn: root.tile?.isOn ?? false
+    readonly property bool isOn: root.tile?.isActive ?? false
     readonly property color fillColor: root.tile?.stateColor ?? "transparent"
 
     // Inline components do not see this file's ids, so everything a segment

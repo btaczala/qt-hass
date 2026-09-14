@@ -61,17 +61,27 @@ EntityBase {
     readonly property bool isOn: root.entityState === "on"
     readonly property bool isUnavailable: root.entityState === "unavailable"
     readonly property bool isActive: !["off", "unavailable", "unknown", root.restingStates[root.domain]].includes(root.entityState)
-    readonly property bool toggleable: ["automation", "fan", "humidifier", "input_boolean", "light", "siren", "switch"].includes(root.domain)
+    readonly property bool toggleable: ["automation", "fan", "humidifier", "input_boolean", "light", "lock", "siren", "switch"].includes(root.domain)
 
-    readonly property color stateColor: root.isActive ? root.activeColor : root.Material.hintTextColor
+    // [resting, active] services for domains that do not toggle with
+    // turn_off/turn_on.
+    readonly property var toggleServices: ({
+        lock: ["lock", "unlock"]
+    })
+
+    // Writable, like stateDisplay, so a tile can be tinted by its own rule,
+    // e.g. a template-card-style color that depends on the state.
+    property color stateColor: root.isActive ? root.activeColor : root.Material.hintTextColor
 
     readonly property string displayName: root.name || root.attributes.friendly_name || root.entity_id
 
     // [resting, active] icons for domains Home Assistant draws per state.
     readonly property var domainIcons: ({
+        alarm_control_panel: ["mdi:shield-off", "mdi:shield-lock"],
         fan: ["mdi:fan-off", "mdi:fan"],
         input_boolean: ["mdi:toggle-switch-off-outline", "mdi:toggle-switch-outline"],
         light: ["mdi:lightbulb-off", "mdi:lightbulb"],
+        lock: ["mdi:lock", "mdi:lock-open-variant"],
         switch: ["mdi:toggle-switch-variant-off", "mdi:toggle-switch-variant"]
     })
     readonly property string resolvedIcon: root.icon || root.attributes.icon || (root.domainIcons[root.domain]?.[root.isActive ? 1 : 0] ?? "mdi:bookmark")
@@ -82,10 +92,13 @@ EntityBase {
         unavailable: qsTr("Unavailable"),
         unknown: qsTr("Unknown")
     })
-    readonly property string stateDisplay: {
+    // Writable, so a tile can show its own text in place of the state.
+    property string stateDisplay: {
         if (root.domain === "light" && root.isOn && root.attributes.brightness != null)
             return qsTr("%1%").arg(Math.round(root.attributes.brightness / 2.55));
-        const label = root.stateLabels[root.entityState] ?? root.entityState;
+        // Other raw states read like HA's: "armed_home" as "Armed home".
+        const raw = root.entityState.replace(/_/g, " ");
+        const label = root.stateLabels[root.entityState] ?? raw.charAt(0).toUpperCase() + raw.slice(1);
         const unit = root.attributes.unit_of_measurement;
         return unit ? qsTr("%1 %2").arg(label).arg(unit) : label;
     }
@@ -119,12 +132,14 @@ EntityBase {
     // `supported`, which must not re-enter placeFeatures() halfway through.
     property bool featuresReady: false
 
+    // `on` means the active state: for a lock, unlocked.
     function setOn(on) {
-        HassAPI.callService(root.domain, on ? "turn_on" : "turn_off", root.entity_id);
+        const services = root.toggleServices[root.domain] ?? ["turn_off", "turn_on"];
+        HassAPI.callService(root.domain, services[on ? 1 : 0], root.entity_id);
     }
 
     function toggle() {
-        root.setOn(!root.isOn);
+        root.setOn(!root.isActive);
     }
 
     function moreInfo() {
