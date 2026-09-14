@@ -7,6 +7,11 @@
 #include <QtCore/QtDebug>
 #include <QtNetwork/QNetworkInterface>
 
+#ifdef Q_OS_ANDROID
+#include <QtCore/QCoreApplication>
+#include <QtCore/QJniObject>
+#endif
+
 #include <QtCore/qloggingcategory.h>
 #include <chrono>
 
@@ -20,6 +25,7 @@ const auto kConfigPath = QStringLiteral(":/qt-hass/config");
 const auto kHassUrlKey = QStringLiteral("connection/url");
 const auto kHassTokenKey = QStringLiteral("connection/token");
 const auto kIdleTimeoutKey = QStringLiteral("idleTimeout");
+const auto kKeepScreenOnKey = QStringLiteral("display/keepScreenOn");
 const auto kMqttHostKey = QStringLiteral("mqtt/host");
 const auto kMqttPortKey = QStringLiteral("mqtt/port");
 const auto kMqttUsernameKey = QStringLiteral("mqtt/username");
@@ -48,6 +54,47 @@ Controler::Controler(QObject *parent)
 
   loadConnection();
   loadMqttConfig();
+
+  keep_screen_on_ = QSettings{}.value(kKeepScreenOnKey, false).toBool();
+  applyKeepScreenOn();
+}
+
+void Controler::setKeepScreenOn(bool on) {
+  if (keep_screen_on_ == on)
+    return;
+  keep_screen_on_ = on;
+  QSettings{}.setValue(kKeepScreenOnKey, on);
+  applyKeepScreenOn();
+  Q_EMIT keepScreenOnChanged();
+}
+
+bool Controler::keepScreenOnSupported() noexcept {
+#ifdef Q_OS_ANDROID
+  return true;
+#else
+  return false;
+#endif
+}
+
+void Controler::applyKeepScreenOn() const {
+#ifdef Q_OS_ANDROID
+  // Window flags may only be changed from the Android UI thread, not Qt's.
+  QNativeInterface::QAndroidApplication::runOnAndroidMainThread(
+      [on = keep_screen_on_]() {
+        // android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+        constexpr jint kFlagKeepScreenOn = 0x00000080;
+        const QJniObject activity =
+            QNativeInterface::QAndroidApplication::context();
+        const QJniObject window =
+            activity.callObjectMethod("getWindow", "()Landroid/view/Window;");
+        if (!window.isValid()) {
+          qCWarning(controller) << "No activity window to keep the screen on";
+          return;
+        }
+        window.callMethod<void>(on ? "addFlags" : "clearFlags", "(I)V",
+                                kFlagKeepScreenOn);
+      });
+#endif
 }
 
 void Controler::loadMqttConfig() {

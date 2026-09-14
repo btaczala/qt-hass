@@ -256,6 +256,15 @@ Page {
                 }
             }
 
+            // Android only: there's no portable equivalent elsewhere.
+            Switch {
+                Layout.fillWidth: true
+                text: Controler.keepScreenOnSupported ? qsTr("Keep screen awake") : qsTr("Keep screen awake (Android only)")
+                enabled: Controler.keepScreenOnSupported
+                checked: Controler.keepScreenOn
+                onToggled: Controler.keepScreenOn = checked
+            }
+
             SectionLabel {
                 text: qsTr("About")
             }

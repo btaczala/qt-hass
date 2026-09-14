@@ -33,6 +33,11 @@ class Controler : public QObject {
                  setIdleTimeoutSeconds NOTIFY idleTimeoutSecondsChanged);
   Q_PROPERTY(bool hassConnected READ hassConnected WRITE setHassConnected
                  NOTIFY hassConnectedChanged);
+  // Keeps the display from turning off while the app is in front, like the
+  // HA companion app's "Keep screen on". Only does anything on Android.
+  Q_PROPERTY(bool keepScreenOn READ keepScreenOn WRITE setKeepScreenOn NOTIFY
+                 keepScreenOnChanged)
+  Q_PROPERTY(bool keepScreenOnSupported READ keepScreenOnSupported CONSTANT)
   Q_PROPERTY(QString mqttBrokerHost READ mqttBrokerHost NOTIFY mqttConfigChanged)
   Q_PROPERTY(int mqttBrokerPort READ mqttBrokerPort NOTIFY mqttConfigChanged)
   Q_PROPERTY(QString mqttUsername READ mqttUsername NOTIFY mqttConfigChanged)
@@ -81,6 +86,12 @@ public:
   // only ever meant to be reached through QML).
   bool hassConnected() const noexcept { return hass_connected_; }
   void setHassConnected(bool connected);
+
+  // Saved to QSettings; off by default. On Android, sets or clears the
+  // activity window's FLAG_KEEP_SCREEN_ON.
+  bool keepScreenOn() const noexcept { return keep_screen_on_; }
+  void setKeepScreenOn(bool on);
+  static bool keepScreenOnSupported() noexcept;
 
   // Remote Admin (RemoteAdmin) config, from the bundled config -- empty
   // password means the server never starts listening, see remoteadmin.cpp.
@@ -136,6 +147,7 @@ signals:
   void screensaverActiveChanged();
   void idleTimeoutSecondsChanged();
   void hassConnectedChanged();
+  void keepScreenOnChanged();
   void mqttConfigChanged();
   void mqttConnectedChanged();
 
@@ -154,6 +166,8 @@ private:
   void loadConfig();
   void loadConnection();
   void loadMqttConfig();
+  // Applies keep_screen_on_ to the Android activity window; a no-op elsewhere.
+  void applyKeepScreenOn() const;
 
   QString bundledValue(const QString &key) const {
     return bundled_config_.value(key);
@@ -166,6 +180,7 @@ private:
   bool screensaver_active_{false};
   bool hass_connected_{false};
   bool mqtt_connected_{false};
+  bool keep_screen_on_{false};
   int idle_timeout_seconds_{60};
   QTimer is_idle_timer_;
   QHash<QString, QString> bundled_config_;
