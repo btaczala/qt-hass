@@ -24,6 +24,10 @@ Item {
         {
             icon: "mdi:lightning-bolt",
             label: qsTr("Energy")
+        },
+        {
+            icon: "mdi:cctv",
+            label: qsTr("Cameras")
         }
     ]
     readonly property real navMargin: 8
@@ -49,5 +53,6 @@ Item {
 
         PageOverview {}
         PageEnergy {}
+        PageCameras {}
     }
 }

@@ -1,0 +1,34 @@
+import QtQuick
+import QtQuick.Layouts
+
+import QtHomeAssistant
+
+// One CameraCard per camera, tap to open its live view. Just
+// camera.g3_flex_high_resolution_channel for now, to test end to end on a
+// real device; add more CameraCard entries here once that's confirmed.
+Flickable {
+    id: root
+
+    readonly property real spacing: 8
+
+    contentHeight: content.implicitHeight + 2 * content.y
+    clip: true
+    boundsBehavior: Flickable.StopAtBounds
+
+    GridLayout {
+        id: content
+
+        x: (root.width - width) / 2
+        y: 16
+        width: Math.min(root.width - 32, 960)
+        columns: content.width >= 640 ? 2 : 1
+        columnSpacing: root.spacing
+        rowSpacing: root.spacing
+
+        CameraCard {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 220
+            entity_id: "camera.g3_flex_high_resolution_channel"
+        }
+    }
+}
