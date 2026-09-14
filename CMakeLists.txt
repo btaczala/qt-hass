@@ -138,6 +138,10 @@ qt_add_qml_module(
   qml/Energy/Details/HomeDetail.qml
   qml/Navigation/NavBar.qml
   qml/Settings/SettingsPage.qml
+  qml/Weather/WeatherCard.qml
+  qml/Weather/WeatherForecast.qml
+  qml/Weather/WeatherIcon.qml
+  qml/Weather/WindIndicator.qml
   qml/Setup/ErrorLabel.qml
   qml/Setup/HassAuth.qml
   qml/Setup/LoginStep.qml

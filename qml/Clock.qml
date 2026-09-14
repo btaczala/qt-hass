@@ -1,9 +1,14 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 
+import QtHomeAssistant
+
 // Time and date, by default in dim greys for dark full-screen overlays (Screensaver,
 // DoNotDisturb). Ticks only while visible; minutePassed() fires on each new
-// minute, e.g. to move the clock around.
+// minute, e.g. to move the clock around. With showWeather, the current
+// weather's icon sits next to the time; tapping it opens a WeatherCard.
 Column {
     id: root
 
@@ -13,6 +18,8 @@ Column {
     property color color: "#b0b0b0"
     property color dateColor: "#808080"
     property bool showDate: true
+    property bool showWeather: true
+    property string weatherEntity: "weather.pirateweather"
 
     signal minutePassed
 
@@ -23,12 +30,37 @@ Column {
 
     spacing: root.size * 0.01
 
-    Label {
+    Row {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: root.now.toLocaleTimeString(Qt.locale(), "HH:mm")
-        font.pixelSize: root.size * 0.2
-        font.weight: Font.Light
-        color: root.color
+        spacing: root.size * 0.04
+
+        Label {
+            id: time
+            text: root.now.toLocaleTimeString(Qt.locale(), "HH:mm")
+            font.pixelSize: root.size * 0.2
+            font.weight: Font.Light
+            color: root.color
+        }
+
+        Loader {
+            anchors.verticalCenter: time.verticalCenter
+            active: root.showWeather
+            visible: active
+
+            sourceComponent: WeatherIcon {
+                condition: weather.state
+                size: root.size * 0.16
+
+                HassEntity {
+                    id: weather
+                    entityId: root.weatherEntity
+                }
+
+                TapHandler {
+                    onTapped: weatherPopup.open()
+                }
+            }
+        }
     }
     Label {
         anchors.horizontalCenter: parent.horizontalCenter
@@ -36,6 +68,35 @@ Column {
         text: root.now.toLocaleDateString(Qt.locale(), "dddd, d MMMM")
         font.pixelSize: root.size * 0.05
         color: root.dateColor
+    }
+
+    Popup {
+        id: weatherPopup
+
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent ? parent.width - 32 : 0, 640)
+        padding: 0
+        modal: true
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: null
+
+        // Only while open, so the forecast isn't fetched in the background.
+        contentItem: Loader {
+            active: weatherPopup.visible
+            sourceComponent: WeatherCard {
+                entityId: root.weatherEntity
+            }
+        }
+
+        // Popups draw above the screensaver, so don't stay open under it.
+        Connections {
+            target: Controler
+            function onScreensaverActiveChanged() {
+                if (Controler.screensaverActive)
+                    weatherPopup.close();
+            }
+        }
     }
 
     Timer {

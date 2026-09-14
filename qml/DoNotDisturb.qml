@@ -58,6 +58,8 @@ Popup {
 
         Clock {
             id: clock
+            // Nothing to tap through to on a full-screen overlay.
+            showWeather: false
             anchors.horizontalCenter: parent.horizontalCenter
             size: Math.min(root.width * 0.6, root.height * 0.5)
         }

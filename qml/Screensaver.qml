@@ -29,6 +29,8 @@ Popup {
 
     Clock {
         id: clock
+        // Nothing to tap through to on a full-screen overlay.
+        showWeather: false
 
         // Where the clock sits, as a fraction of the room left around it, so
         // it stays fully on screen as its size or the screen's changes.
