@@ -40,6 +40,8 @@ EntityBase {
     property color activeColor: "#ffc107"
     property bool vertical: false
     property bool hideState: false
+    // Just the icon: no name or state beside it.
+    property bool iconOnly: false
 
     // Actions, see above. The icon's own actions fall back to these when unset:
     // iconTapAction to toggling (or more-info when the entity can't toggle),
@@ -81,7 +83,8 @@ EntityBase {
     readonly property bool isOn: root.entityState === "on"
     readonly property bool isUnavailable: root.entityState === "unavailable"
     readonly property bool isActive: !["off", "unavailable", "unknown", root.restingStates[root.domain]].includes(root.entityState)
-    readonly property bool toggleable: ["automation", "fan", "humidifier", "input_boolean", "light", "lock", "siren", "switch"].includes(root.domain)
+    // Climate entities turn on and off only with TURN_ON (128) and TURN_OFF (256) set.
+    readonly property bool toggleable: ["automation", "fan", "humidifier", "input_boolean", "light", "lock", "siren", "switch"].includes(root.domain) || root.domain === "climate" && (root.attributes.supported_features & 384) === 384
 
     // [resting, active] services for domains that do not toggle with
     // turn_off/turn_on.
@@ -293,6 +296,7 @@ EntityBase {
 
                 ColumnLayout {
                     Layout.fillWidth: true
+                    visible: !root.iconOnly
                     spacing: 0
 
                     Label {

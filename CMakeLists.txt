@@ -125,6 +125,8 @@ qt_add_qml_module(
   qml/SystemTray/CountIndicator.qml
   qml/SystemTray/HassAlerts.qml
   qml/SystemTray/SystemTrayPanel.qml
+  qml/Area/AreaCard.qml
+  qml/Area/AreaSensor.qml
   qml/Cards/Weather.qml
   qml/Cards/ButtonCard.qml
   qml/Features/ToggleFeature.qml
