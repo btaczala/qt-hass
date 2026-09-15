@@ -178,6 +178,7 @@ qt_add_qml_module(
   qml/Setup/ServerStep.qml
   qml/Setup/SetupWizard.qml
   qml/Settings/UiSettings.qml
+  qml/Settings/HassDashboardList.qml
   RESOURCES
   fonts/materialdesignicons-webfont.ttf
   images/lightbulb.svg

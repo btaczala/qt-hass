@@ -9,31 +9,61 @@
 #   just android-deploy qt67    # build then run, in one step
 # ("qt610" works the same everywhere "qt67" does above.)
 #
-#   just dashboard-sync               # copy examples/office-panel to Home Assistant
-#   just dashboard-sync my-panel      # or another directory under examples/
+#   just dashboard-sync               # copy every examples/* dashboard to Home Assistant
+#   just dashboard-sync office-panel  # or just these ones
 
 image_tag := "qthass-android"
 gradle_cache_volume := "qthass-gradle-cache"
 
 # Where dashboards go: an ssh host (~/.ssh/config) and Home Assistant's
-# /config/www/qthass/, served at http://<hass>:8123/local/qthass/.
+# /config/www/qthass/, served at http://<hass>:8123/local/qthass/. Each
+# dashboard gets its own folder there; examples/index.json lists them for the
+# app's settings when the dashboard source is "Home Assistant www folder".
 hass_ssh := "hass"
-hass_dashboard_dir := "/config/www/qthass/"
+hass_dashboard_dir := "/config/www/qthass"
 
-# Copy a dashboard from examples/ into Home Assistant's www.
-dashboard-sync example="office-panel":
+# Copy dashboards from examples/ (all by default) and its index.json into Home Assistant's www.
+dashboard-sync *examples:
     #!/usr/bin/env bash
     set -euo pipefail
-    # The app picks it up on its next connect, or on Reload in its settings.
-    src="{{ justfile_directory() }}/examples/{{ example }}/"
-    if [ ! -f "$src/main.qml" ]; then
-      echo "no dashboard at $src (expected a main.qml)" >&2
+    cd "{{ justfile_directory() }}/examples"
+    names=({{ examples }})
+    if [ ${#names[@]} -eq 0 ]; then
+      for dir in */; do
+        [ -f "$dir/main.qml" ] && names+=("${dir%/}")
+      done
+    fi
+    for name in "${names[@]}"; do
+      if [ ! -f "$name/main.qml" ]; then
+        echo "no dashboard at examples/$name (expected a main.qml)" >&2
+        exit 1
+      fi
+    done
+    # Home Assistant serves www files but not folder listings (403 for
+    # /local/qthass/), so the app's settings list the dashboards from
+    # examples/index.json, a JSON array of folder names kept by hand.
+    python3 - <<'EOF'
+    import json, os, sys
+    names = json.load(open("index.json"))
+    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
+        sys.exit("examples/index.json must be a JSON array of folder names")
+    missing = [n for n in names if not os.path.isfile(os.path.join(n, "main.qml"))]
+    if missing:
+        sys.exit("examples/index.json lists folders without a main.qml: " + ", ".join(missing))
+    EOF
+    # Homebrew's rsync, not macOS's own (openrsync), which lacks --mkpath.
+    rsync="$(brew --prefix)/bin/rsync"
+    if [ ! -x "$rsync" ]; then
+      echo "no Homebrew rsync at $rsync -- brew install rsync" >&2
       exit 1
     fi
-    # The directory's contents, not the directory: the dashboard URL points at
-    # .../local/qthass/main.qml. -rt rather than -a, so files on the server
-    # don't take this machine's user and group ids.
-    rsync -rtv --chmod=D755,F644 --exclude .DS_Store "$src" "{{ hass_ssh }}:{{ hass_dashboard_dir }}"
+    # -rt rather than -a, so files on the server don't take this machine's
+    # user and group ids.
+    for name in "${names[@]}"; do
+      "$rsync" -rtv --mkpath --chmod=D755,F644 --exclude .DS_Store \
+        "$name/" "{{ hass_ssh }}:{{ hass_dashboard_dir }}/$name/"
+    done
+    "$rsync" -tv --mkpath --chmod=F644 index.json "{{ hass_ssh }}:{{ hass_dashboard_dir }}/"
 
 # Build (or rebuild) the Android toolchain image for `variant`.
 android-image variant:

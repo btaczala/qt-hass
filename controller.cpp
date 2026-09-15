@@ -4,6 +4,7 @@
 #include <QtCore/QFile>
 #include <QtCore/QSettings>
 #include <QtCore/QSysInfo>
+#include <QtCore/QUrl>
 #include <QtCore/QtDebug>
 #include <QtNetwork/QNetworkInterface>
 
@@ -27,6 +28,10 @@ const auto kConfigPath = QStringLiteral(":/qt-hass/config");
 const auto kHassUrlKey = QStringLiteral("connection/url");
 const auto kHassTokenKey = QStringLiteral("connection/token");
 const auto kDashboardUrlKey = QStringLiteral("dashboard/url");
+const auto kDashboardSourceKey = QStringLiteral("dashboard/source");
+const auto kDashboardConfigKey = QStringLiteral("dashboard/config");
+const auto kDashboardSourceHass = QStringLiteral("hass");
+const auto kDashboardSourceUrl = QStringLiteral("url");
 const auto kIdleTimeoutKey = QStringLiteral("idleTimeout");
 const auto kKeepScreenOnKey = QStringLiteral("display/keepScreenOn");
 const auto kMqttHostKey = QStringLiteral("mqtt/host");
@@ -69,9 +74,19 @@ Controler::Controler(QObject *parent)
 
   loadConnection();
   loadMqttConfig();
-  dashboard_url_ = QSettings{}
-                       .value(kDashboardUrlKey, bundledValue("DASHBOARD_URL"))
-                       .toString();
+  {
+    const QSettings settings;
+    dashboard_source_ =
+        settings.value(kDashboardSourceKey, kDashboardSourceUrl).toString();
+    custom_dashboard_url_ =
+        settings.value(kDashboardUrlKey, bundledValue("DASHBOARD_URL"))
+            .toString();
+    dashboard_config_ = settings.value(kDashboardConfigKey).toString();
+  }
+  updateDashboardUrl();
+  // The Home Assistant www URL follows the connection's.
+  connect(this, &Controler::hassUrlChanged, this,
+          &Controler::updateDashboardUrl);
 
   // Never saved: an install that already has a token (bundled, environment
   // or saved from the settings page) is set up; only one without runs setup.
@@ -296,7 +311,18 @@ void Controler::setHassToken(const QString &token) {
   Q_EMIT hassTokenChanged();
 }
 
-void Controler::setDashboardUrl(const QString &url) {
+void Controler::setDashboardSource(const QString &source) {
+  const QString valid =
+      source == kDashboardSourceHass ? kDashboardSourceHass : kDashboardSourceUrl;
+  if (valid == dashboard_source_)
+    return;
+  dashboard_source_ = valid;
+  QSettings{}.setValue(kDashboardSourceKey, valid);
+  Q_EMIT dashboardSourceChanged();
+  updateDashboardUrl();
+}
+
+void Controler::setCustomDashboardUrl(const QString &url) {
   QSettings settings;
   if (url.isEmpty())
     settings.remove(kDashboardUrlKey);
@@ -305,9 +331,52 @@ void Controler::setDashboardUrl(const QString &url) {
   const QString resolved =
       settings.value(kDashboardUrlKey, bundledValue("DASHBOARD_URL"))
           .toString();
-  if (resolved == dashboard_url_)
+  if (resolved == custom_dashboard_url_)
     return;
-  dashboard_url_ = resolved;
+  custom_dashboard_url_ = resolved;
+  Q_EMIT dashboardSourceChanged();
+  updateDashboardUrl();
+}
+
+void Controler::setDashboardConfig(const QString &config) {
+  if (config == dashboard_config_)
+    return;
+  dashboard_config_ = config;
+  QSettings{}.setValue(kDashboardConfigKey, config);
+  Q_EMIT dashboardSourceChanged();
+  updateDashboardUrl();
+}
+
+QString Controler::hassDashboardsUrl() const {
+  QUrl url(hass_url_);
+  if (url.scheme() == u"ws")
+    url.setScheme(QStringLiteral("http"));
+  else if (url.scheme() == u"wss")
+    url.setScheme(QStringLiteral("https"));
+  else if (url.scheme() != u"http" && url.scheme() != u"https")
+    return {};
+  if (url.host().isEmpty())
+    return {};
+  // Home Assistant serves /config/www/ at /local/.
+  url.setPath(QStringLiteral("/local/qthass/"));
+  url.setQuery(QString{});
+  url.setFragment(QString{});
+  return url.toString();
+}
+
+void Controler::updateDashboardUrl() {
+  QString url = custom_dashboard_url_;
+  if (dashboard_source_ == kDashboardSourceHass) {
+    const QString base = hassDashboardsUrl();
+    url = base.isEmpty() || dashboard_config_.isEmpty()
+              ? QString{}
+              : base + QString::fromUtf8(QUrl::toPercentEncoding(
+                           dashboard_config_)) +
+                    QStringLiteral("/main.qml");
+  }
+  if (url == dashboard_url_)
+    return;
+  dashboard_url_ = url;
   Q_EMIT dashboardUrlChanged();
 }
 

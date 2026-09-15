@@ -73,10 +73,12 @@ Popup {
 
     // Notification and repair texts link to the web or, relative, to pages on
     // the Home Assistant server.
+    function serverUrl(link: string): string {
+        return link.startsWith("/") ? Controler.hassUrl.replace(/^ws/, "http").replace(/\/api\/websocket\/?$/, "") + link : link;
+    }
+
     function openLink(link: string) {
-        if (link.startsWith("/"))
-            link = Controler.hassUrl.replace(/^ws/, "http").replace(/\/api\/websocket\/?$/, "") + link;
-        Qt.openUrlExternally(link);
+        Qt.openUrlExternally(root.serverUrl(link));
     }
 
     parent: Overlay.overlay
@@ -166,6 +168,18 @@ Popup {
         property color metaColor: entry.Material.hintTextColor
         property string link
 
+        // Markdown images (e.g. a vacuum's map as a data: URL), taken out of
+        // the text: a Label draws them at their own size, however wide.
+        readonly property var images: {
+            const pattern = /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?[^)]*\)/g;
+            const urls = [];
+            let match;
+            while ((match = pattern.exec(entry.body)) !== null)
+                urls.push(match[1]);
+            return urls;
+        }
+        readonly property string text: entry.body.replace(/!\[[^\]]*\]\([^)]*\)/g, "").trim()
+
         Layout.fillWidth: true
         spacing: 2
 
@@ -178,12 +192,31 @@ Popup {
 
         Label {
             Layout.fillWidth: true
-            visible: entry.body !== ""
-            text: entry.body
+            visible: entry.text !== ""
+            text: entry.text
             textFormat: Text.MarkdownText
             wrapMode: Text.Wrap
             color: entry.Material.secondaryTextColor
             onLinkActivated: link => root.openLink(link)
+        }
+
+        // Scaled down to the panel's width, never up.
+        Repeater {
+            model: entry.images
+
+            Image {
+                id: image
+
+                required property string modelData
+
+                Layout.fillWidth: true
+                Layout.maximumWidth: image.implicitWidth
+                Layout.preferredHeight: image.implicitWidth > 0 ? image.width * image.implicitHeight / image.implicitWidth : 0
+                Layout.topMargin: 4
+                source: root.serverUrl(image.modelData)
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+            }
         }
 
         RowLayout {

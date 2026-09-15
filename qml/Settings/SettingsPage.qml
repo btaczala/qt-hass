@@ -21,6 +21,14 @@ Popup {
     // Read by the About section; refreshed by reset().
     property var systemInfo: ({})
 
+    // The dashboard source and Home Assistant dashboard being edited, applied
+    // by Save and reload.
+    property string dashboardSource
+    property string dashboardConfig
+    // The listed dashboards, plus the chosen one when the list lacks it (e.g.
+    // it couldn't be read), so the choice still shows.
+    readonly property var dashboardConfigs: root.dashboardConfig === "" || hassDashboards.names.includes(root.dashboardConfig) ? hassDashboards.names : [root.dashboardConfig].concat(hassDashboards.names)
+
     // Asks the app to load the dashboard again, from Controler.dashboardUrl.
     signal reloadDashboardRequested
 
@@ -30,11 +38,19 @@ Popup {
         root.systemInfo = Controler.systemInfo();
         urlField.text = Controler.hassUrl;
         tokenField.text = Controler.hassToken;
-        dashboardUrlField.text = Controler.dashboardUrl;
+        root.dashboardSource = Controler.dashboardSource;
+        root.dashboardConfig = Controler.dashboardConfig;
+        dashboardUrlField.text = Controler.customDashboardUrl;
+        if (root.dashboardSource === "hass")
+            hassDashboards.refresh();
         mqttHostField.text = Controler.mqttBrokerHost;
         mqttPortField.text = Controler.mqttBrokerPort;
         mqttUsernameField.text = Controler.mqttUsername;
         mqttPasswordField.text = Controler.mqttPassword;
+    }
+
+    HassDashboardList {
+        id: hassDashboards
     }
 
     parent: Overlay.overlay
@@ -197,9 +213,72 @@ Popup {
                     text: qsTr("Dashboard")
                 }
 
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Source")
+                    }
+
+                    ComboBox {
+                        Layout.preferredWidth: 280
+                        textRole: "text"
+                        valueRole: "value"
+                        model: [
+                            { text: qsTr("Home Assistant www folder"), value: "hass" },
+                            { text: qsTr("URL"), value: "url" }
+                        ]
+                        currentIndex: indexOfValue(root.dashboardSource)
+                        onActivated: {
+                            root.dashboardSource = currentValue;
+                            if (root.dashboardSource === "hass")
+                                hassDashboards.refresh();
+                        }
+                    }
+                }
+
+                // A dashboard from /config/www/qthass/<name>/main.qml.
+                RowLayout {
+                    Layout.fillWidth: true
+                    visible: root.dashboardSource === "hass"
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Dashboard")
+                    }
+
+                    ComboBox {
+                        Layout.preferredWidth: 280
+                        model: root.dashboardConfigs
+                        displayText: currentIndex < 0 ? qsTr("Choose...") : currentText
+                        currentIndex: root.dashboardConfigs.indexOf(root.dashboardConfig)
+                        onActivated: index => root.dashboardConfig = root.dashboardConfigs[index]
+                    }
+
+                    ToolButton {
+                        enabled: !hassDashboards.loading
+                        contentItem: MdiIcon {
+                            icon: "mdi:refresh"
+                        }
+                        Accessible.name: qsTr("Refresh the list")
+                        onClicked: hassDashboards.refresh()
+                    }
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    visible: root.dashboardSource === "hass"
+                    text: hassDashboards.loading ? qsTr("Reading /config/www/qthass/index.json...") : hassDashboards.error !== "" ? hassDashboards.error : root.dashboardConfig !== "" ? Controler.hassDashboardsUrl + root.dashboardConfig + "/main.qml" : qsTr("Folders of /config/www/qthass/ with a main.qml, as listed in its index.json.")
+                    wrapMode: Text.WrapAnywhere
+                    font.pixelSize: 12
+                    color: hassDashboards.error !== "" ? root.Material.color(Material.Red, Material.Shade300) : root.Material.hintTextColor
+                }
+
                 TextField {
                     id: dashboardUrlField
                     Layout.fillWidth: true
+                    visible: root.dashboardSource === "url"
                     placeholderText: qsTr("URL, e.g. http://homeassistant.local:8123/local/qthass/main.qml")
                     inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
                 }
@@ -214,17 +293,22 @@ Popup {
                         color: root.Material.hintTextColor
                     }
 
-                    // Saves an edited URL first. Either way the dashboard is
+                    // Saves an edited source first. Either way the dashboard is
                     // loaded again from scratch, and the settings close to show it.
                     Button {
-                        readonly property bool edited: dashboardUrlField.text.trim() !== Controler.dashboardUrl
+                        readonly property bool hass: root.dashboardSource === "hass"
+                        readonly property bool edited: root.dashboardSource !== Controler.dashboardSource || (hass ? root.dashboardConfig !== Controler.dashboardConfig : dashboardUrlField.text.trim() !== Controler.customDashboardUrl)
 
                         text: edited ? qsTr("Save and reload") : qsTr("Reload")
-                        enabled: dashboardUrlField.text.trim() !== "" || edited
+                        enabled: hass ? root.dashboardConfig !== "" : dashboardUrlField.text.trim() !== "" || edited
                         highlighted: true
                         onClicked: {
-                            Controler.dashboardUrl = dashboardUrlField.text.trim();
-                            dashboardUrlField.text = Controler.dashboardUrl;
+                            Controler.dashboardSource = root.dashboardSource;
+                            if (hass)
+                                Controler.dashboardConfig = root.dashboardConfig;
+                            else
+                                Controler.customDashboardUrl = dashboardUrlField.text.trim();
+                            dashboardUrlField.text = Controler.customDashboardUrl;
                             root.reloadDashboardRequested();
                             root.close();
                         }

@@ -26,9 +26,22 @@ class Controler : public QObject {
                  hassUrlChanged)
   Q_PROPERTY(QString hassToken READ hassToken WRITE setHassToken NOTIFY
                  hassTokenChanged)
-  // Where the dashboard comes from; empty means none is defined.
-  Q_PROPERTY(QString dashboardUrl READ dashboardUrl WRITE setDashboardUrl
-                 NOTIFY dashboardUrlChanged)
+  // The dashboard's root QML file, from dashboardSource; empty means none is
+  // defined.
+  Q_PROPERTY(QString dashboardUrl READ dashboardUrl NOTIFY dashboardUrlChanged)
+  // Where the dashboard comes from: "url" for customDashboardUrl, or "hass"
+  // for dashboardConfig in Home Assistant's www folder (hassDashboardsUrl).
+  Q_PROPERTY(QString dashboardSource READ dashboardSource WRITE
+                 setDashboardSource NOTIFY dashboardSourceChanged)
+  Q_PROPERTY(QString customDashboardUrl READ customDashboardUrl WRITE
+                 setCustomDashboardUrl NOTIFY dashboardSourceChanged)
+  // A directory of /config/www/qthass/ holding a main.qml.
+  Q_PROPERTY(QString dashboardConfig READ dashboardConfig WRITE
+                 setDashboardConfig NOTIFY dashboardSourceChanged)
+  // Home Assistant's /config/www/qthass/ over HTTP, from hassUrl; empty
+  // without a usable hassUrl.
+  Q_PROPERTY(
+      QString hassDashboardsUrl READ hassDashboardsUrl NOTIFY hassUrlChanged)
   Q_PROPERTY(bool screensaverActive READ screensaverActive WRITE
                  setScreensaverActive NOTIFY screensaverActiveChanged);
   // Seconds without user input before the screensaver starts; 0 means never.
@@ -92,10 +105,16 @@ public:
   // environment and bundled config again.
   Q_INVOKABLE void clearSavedConnection();
 
+  QString dashboardUrl() const noexcept { return dashboard_url_; }
+  QString dashboardSource() const noexcept { return dashboard_source_; }
+  void setDashboardSource(const QString &source);
   // The bundled DASHBOARD_URL, overridden by a URL saved from the settings
   // page. Saving an empty URL forgets the saved one.
-  QString dashboardUrl() const noexcept { return dashboard_url_; }
-  void setDashboardUrl(const QString &url);
+  QString customDashboardUrl() const noexcept { return custom_dashboard_url_; }
+  void setCustomDashboardUrl(const QString &url);
+  QString dashboardConfig() const noexcept { return dashboard_config_; }
+  void setDashboardConfig(const QString &config);
+  QString hassDashboardsUrl() const;
 
   bool screensaverActive() const noexcept { return screensaver_active_; }
   void setScreensaverActive(bool active);
@@ -189,6 +208,7 @@ signals:
   void hassUrlChanged();
   void hassTokenChanged();
   void dashboardUrlChanged();
+  void dashboardSourceChanged();
   void screensaverActiveChanged();
   void idleTimeoutSecondsChanged();
   void hassConnectedChanged();
@@ -242,7 +262,14 @@ private:
   QHash<QString, QString> bundled_config_;
   QString hass_url_;
   QString hass_token_;
+  // Recomputes dashboard_url_ from the source, emitting dashboardUrlChanged
+  // when it changed.
+  void updateDashboardUrl();
+
   QString dashboard_url_;
+  QString dashboard_source_;
+  QString custom_dashboard_url_;
+  QString dashboard_config_;
   QString mqtt_broker_host_;
   int mqtt_broker_port_{1883};
   QString mqtt_username_;
