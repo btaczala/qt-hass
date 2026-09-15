@@ -15,6 +15,10 @@ import QtHomeAssistant
 //             DashboardPage { title: qsTr("Cameras"); icon: "mdi:cctv"; MyCameras { anchors.fill: parent } }
 //         ]
 //
+//         // A page loaded from a file can be navigated to, e.g. by a Tile's
+//         // tapAction: { action: "navigate", page: "LivingRoom.qml" }.
+//         DashboardPage { title: qsTr("Living room"); icon: "mdi:sofa"; source: "LivingRoom.qml" }
+//
 //         // Anything else is part of the dashboard without being a page,
 //         // e.g. a DashboardOverlay.
 //         MyDoNotDisturb {}
@@ -39,6 +43,21 @@ Item {
     property var screensaverEnergyEntities: null
 
     signal menuRequested
+
+    // Shows the page whose `source` is the QML file `page`, compared as each
+    // page resolves its own. It has to be one of `pages`. Returns whether it
+    // was.
+    function showPage(page) {
+        for (let i = 0; i < root.pages.length; ++i) {
+            const candidate = root.pages[i] as DashboardPage;
+            if (candidate && candidate.source !== "" && candidate.resolvedSource.toString() === Qt.resolvedUrl(page, candidate).toString()) {
+                navBar.currentIndex = i;
+                return true;
+            }
+        }
+        console.warn(`Dashboard: no page with source ${page} in pages`);
+        return false;
+    }
 
     readonly property real navMargin: 8
 

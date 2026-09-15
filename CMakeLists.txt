@@ -139,6 +139,7 @@ qt_add_qml_module(
   qml/Details/BinarySensorHistory.qml
   qml/Dashboard/Dashboard.qml
   qml/Dashboard/DashboardPage.qml
+  qml/Dashboard/DashboardNavigation.js
   qml/Dashboard/DashboardOverlay.qml
   qml/Dashboard/DashboardMessage.qml
   qml/Dashboard/DashboardHost.qml

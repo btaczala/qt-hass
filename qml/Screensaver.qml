@@ -12,6 +12,12 @@ import QtHomeAssistant
 // swallows clicks/touches before they reach the dashboard underneath, so it
 // has to dismiss itself on tap rather than rely on Controler's eventFilter
 // (installed on the root window) seeing a press that never gets that far.
+//
+// A dashboard can bring its own screensaver (`source`, a QML file whose root
+// is any Item): it fills the screen in place of the clock, weather and energy
+// summary, created each time the screensaver shows. The black background, the
+// system tray above it and tap to dismiss stay. When it doesn't compile or
+// can't be created, the built-in one shows instead.
 Popup {
     id: screensaver
 
@@ -35,6 +41,43 @@ Popup {
     property HassAlerts alerts: null
     property bool showNotifications: false
     property bool showSettingsAlerts: false
+    // The dashboard's own screensaver, e.g. DashboardSync.screensaverUrl;
+    // empty for the built-in one.
+    property url source
+    // Why `source` didn't compile; empty when it did.
+    readonly property string error: screensaver.loadError
+
+    property Component customComponent: null
+    property string loadError
+    readonly property bool custom: customLoader.item !== null
+
+    function loadCustom() {
+        screensaver.customComponent = null;
+        screensaver.loadError = "";
+        const url = screensaver.source.toString();
+        if (url === "")
+            return;
+        const component = Qt.createComponent(url, Component.Asynchronous);
+        const finish = () => {
+            // A newer loadCustom() started meanwhile.
+            if (screensaver.source.toString() !== url || component.status === Component.Loading)
+                return;
+            if (component.status === Component.Error) {
+                // Paths relative to the dashboard, not to the cache.
+                screensaver.loadError = component.errorString().split(url.substring(0, url.lastIndexOf("/") + 1)).join("").trim();
+                console.warn(`Screensaver: ${screensaver.loadError}`);
+            } else {
+                screensaver.customComponent = component;
+            }
+        };
+        if (component.status === Component.Loading)
+            component.statusChanged.connect(finish);
+        else
+            finish();
+    }
+
+    onSourceChanged: screensaver.loadCustom()
+    Component.onCompleted: screensaver.loadCustom()
 
     // Only while shown and connected: nothing to read otherwise.
     readonly property bool live: screensaver.visible && HassAPI.connected
@@ -43,6 +86,16 @@ Popup {
 
     background: Rectangle {
         color: "black"
+    }
+
+    // Below the tray and the tap-to-dismiss MouseArea, declared after it.
+    Loader {
+        id: customLoader
+        anchors.fill: parent
+        active: screensaver.visible && screensaver.customComponent !== null
+        sourceComponent: screensaver.customComponent
+        onStatusChanged: if (customLoader.status === Loader.Error)
+            console.warn("Screensaver: the dashboard's screensaver couldn't be created, showing the built-in one")
     }
 
     // Clock and weather move around together, in the room above the energy
@@ -64,6 +117,7 @@ Popup {
         readonly property real minY: tray.visible ? tray.y + tray.height + panel.unit * 0.02 : 0
         readonly property real room: energy.visible ? energy.y - panel.unit * 0.05 : screensaver.height
 
+        visible: !screensaver.custom
         x: panel.fractionX * Math.max(0, screensaver.width - panel.width)
         y: panel.minY + panel.fractionY * Math.max(0, panel.room - panel.minY - panel.height)
         spacing: panel.unit * 0.05
@@ -92,7 +146,7 @@ Popup {
 
         Loader {
             anchors.horizontalCenter: parent.horizontalCenter
-            active: screensaver.live && screensaver.weatherEntity !== ""
+            active: screensaver.live && screensaver.weatherEntity !== "" && !screensaver.custom
             visible: active
 
             sourceComponent: WeatherSummary {
@@ -131,7 +185,7 @@ Popup {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: screensaver.unit * 0.04
-        active: screensaver.live && !!screensaver.energyEntities
+        active: screensaver.live && !!screensaver.energyEntities && !screensaver.custom
         visible: active
 
         sourceComponent: EnergySummary {

@@ -1,0 +1,4 @@
+# The files of this dashboard besides main.qml, which qthomeassistant downloads
+# along with it. Each line: <type name> <version> <file>. Pages loaded by
+# DashboardPage.source have to be listed here too, or they aren't downloaded.
+SalonPage 1.0 SalonPage.qml

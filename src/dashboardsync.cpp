@@ -30,6 +30,7 @@ const auto kMaxWarnings = 20;
 const auto kCachedUrlKey = QStringLiteral("dashboard/cachedUrl");
 const auto kCachedDirKey = QStringLiteral("dashboard/cachedDir");
 const auto kCachedRootKey = QStringLiteral("dashboard/cachedRoot");
+const auto kCachedScreensaverKey = QStringLiteral("dashboard/cachedScreensaver");
 const auto kSyncedAtKey = QStringLiteral("dashboard/syncedAt");
 
 // qmldir lines that don't name a file of the dashboard.
@@ -94,6 +95,14 @@ DashboardSync::DashboardSync(QQmlEngine *engine, QObject *parent)
       QFile::exists(path)) {
     local_url_ = QUrl::fromLocalFile(path);
     synced_at_ = settings.value(kSyncedAtKey).toDateTime();
+    // The screensaver only when it's the one configured, too.
+    const QString screensaver =
+        settings.value(kCachedScreensaverKey).toString();
+    const QString screensaverPath = cacheRoot() + u'/' + dir + u'/' + screensaver;
+    if (!screensaver.isEmpty() &&
+        screensaver == Controler::instance()->screensaverFile() &&
+        QFile::exists(screensaverPath))
+      screensaver_url_ = QUrl::fromLocalFile(screensaverPath);
   }
   prune(dir);
 
@@ -106,8 +115,8 @@ QString DashboardSync::cacheRoot() const {
          u"/dashboard";
 }
 
-void DashboardSync::sync(const QString &url) {
-  qCDebug(dashboardSync) << "Sync requested for" << url;
+void DashboardSync::sync(const QString &url, const QString &screensaver) {
+  qCDebug(dashboardSync) << "Sync requested for" << url << screensaver;
   for (QNetworkReply *reply : std::as_const(replies_)) {
     reply->disconnect(this);
     reply->abort();
@@ -118,7 +127,7 @@ void DashboardSync::sync(const QString &url) {
 
   const QUrl root = QUrl::fromUserInput(url.trimmed());
   if (url.trimmed().isEmpty()) {
-    setLocal({}, {});
+    setLocal({}, {}, {});
     setError({});
     setSyncing(false);
     Q_EMIT synced(false);
@@ -126,7 +135,10 @@ void DashboardSync::sync(const QString &url) {
   }
   // A copy of another URL's dashboard isn't this one's last good copy.
   if (QSettings{}.value(kCachedUrlKey).toString() != url)
-    setLocal({}, {});
+    setLocal({}, {}, {});
+  // Nor is another screensaver's this one's.
+  else if (QSettings{}.value(kCachedScreensaverKey).toString() != screensaver)
+    setLocal(local_url_, {}, synced_at_);
 
   if (!root.isValid() ||
       (root.scheme() != u"http" && root.scheme() != u"https" &&
@@ -138,16 +150,27 @@ void DashboardSync::sync(const QString &url) {
     return;
   }
 
+  if (!screensaver.isEmpty() &&
+      (!isSafeRelativePath(screensaver) || !screensaver.endsWith(u".qml"))) {
+    fail(tr("The screensaver has to be a .qml file in the dashboard's "
+            "directory: %1")
+             .arg(screensaver));
+    return;
+  }
+
   qCInfo(dashboardSync) << "Downloading" << root;
   setSyncing(true);
   download_.root = root;
   download_.rootName = root.fileName();
+  download_.screensaverName = screensaver;
   download_.url = url;
 
   // A dashboard on this machine, e.g. while writing one: copied like a
   // downloaded one, so each change still gets new file URLs.
   if (root.isLocalFile()) {
     QStringList queue = {download_.rootName, QStringLiteral("qmldir")};
+    if (!screensaver.isEmpty())
+      queue.append(screensaver);
     while (!queue.isEmpty()) {
       const QString name = queue.takeFirst();
       if (download_.files.contains(name))
@@ -170,6 +193,8 @@ void DashboardSync::sync(const QString &url) {
 
   fetch(download_.rootName, false);
   fetch(QStringLiteral("qmldir"), true);
+  if (!screensaver.isEmpty())
+    fetch(screensaver, false);
 }
 
 QStringList DashboardSync::addFile(const QString &name, const QByteArray &data) {
@@ -275,6 +300,7 @@ void DashboardSync::finish() {
   settings.setValue(kCachedUrlKey, download_.url);
   settings.setValue(kCachedDirKey, dirName);
   settings.setValue(kCachedRootKey, download_.rootName);
+  settings.setValue(kCachedScreensaverKey, download_.screensaverName);
   settings.setValue(kSyncedAtKey, now);
   // The previous copy may still be loaded until the app switches over; it
   // goes on the next start.
@@ -285,7 +311,11 @@ void DashboardSync::finish() {
   }
 
   qCInfo(dashboardSync) << "Downloaded" << names.size() << "files to" << dir;
-  setLocal(QUrl::fromLocalFile(dir + u'/' + download_.rootName), now);
+  setLocal(QUrl::fromLocalFile(dir + u'/' + download_.rootName),
+           download_.screensaverName.isEmpty()
+               ? QUrl()
+               : QUrl::fromLocalFile(dir + u'/' + download_.screensaverName),
+           now);
   setError({});
   setSyncing(false);
   Q_EMIT synced(true);
@@ -358,10 +388,13 @@ void DashboardSync::setError(const QString &error) {
   Q_EMIT errorChanged();
 }
 
-void DashboardSync::setLocal(const QUrl &url, const QDateTime &syncedAt) {
-  if (local_url_ == url && synced_at_ == syncedAt)
+void DashboardSync::setLocal(const QUrl &url, const QUrl &screensaverUrl,
+                             const QDateTime &syncedAt) {
+  if (local_url_ == url && screensaver_url_ == screensaverUrl &&
+      synced_at_ == syncedAt)
     return;
   local_url_ = url;
+  screensaver_url_ = screensaverUrl;
   synced_at_ = syncedAt;
   Q_EMIT localUrlChanged();
 }

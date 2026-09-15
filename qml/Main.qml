@@ -80,7 +80,7 @@ ApplicationWindow {
     SettingsPage {
         id: settingsPage
         settings: uiSettings
-        dashboardStatus: dashboardHost.statusText
+        dashboardStatus: screensaver.error !== "" ? qsTr("%1\nThe screensaver has errors, showing the built-in one: %2").arg(dashboardHost.statusText).arg(screensaver.error) : dashboardHost.statusText
         onReloadDashboardRequested: dashboardHost.reload()
     }
 
@@ -96,7 +96,10 @@ ApplicationWindow {
     }
 
     Screensaver {
+        id: screensaver
         visible: Controler.screensaverActive
+        // The dashboard's own, when it has one; kept while disconnected.
+        source: DashboardSync.screensaverUrl
         showBattery: Controler.batterySupported && uiSettings.showBattery
         alerts: hassAlerts
         showNotifications: uiSettings.showNotifications

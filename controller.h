@@ -35,9 +35,22 @@ class Controler : public QObject {
                  setDashboardSource NOTIFY dashboardSourceChanged)
   Q_PROPERTY(QString customDashboardUrl READ customDashboardUrl WRITE
                  setCustomDashboardUrl NOTIFY dashboardSourceChanged)
-  // A directory of /config/www/qthass/ holding a main.qml.
+  // A directory of /config/www/qthass/, as index.json lists it.
   Q_PROPERTY(QString dashboardConfig READ dashboardConfig WRITE
                  setDashboardConfig NOTIFY dashboardSourceChanged)
+  // Its root file and optional screensaver, from its index.json entry; saved
+  // with the config, so a changed index.json takes effect once saved again.
+  Q_PROPERTY(QString dashboardMain READ dashboardMain WRITE setDashboardMain
+                 NOTIFY dashboardSourceChanged)
+  Q_PROPERTY(QString dashboardScreensaver READ dashboardScreensaver WRITE
+                 setDashboardScreensaver NOTIFY dashboardSourceChanged)
+  // The "url" source's screensaver: a file next to customDashboardUrl.
+  Q_PROPERTY(QString customScreensaver READ customScreensaver WRITE
+                 setCustomScreensaver NOTIFY dashboardSourceChanged)
+  // The screensaver QML file, relative to dashboardUrl's directory, from
+  // dashboardSource; empty means the built-in one.
+  Q_PROPERTY(
+      QString screensaverFile READ screensaverFile NOTIFY dashboardUrlChanged)
   // Home Assistant's /config/www/qthass/ over HTTP, from hassUrl; empty
   // without a usable hassUrl.
   Q_PROPERTY(
@@ -114,6 +127,15 @@ public:
   void setCustomDashboardUrl(const QString &url);
   QString dashboardConfig() const noexcept { return dashboard_config_; }
   void setDashboardConfig(const QString &config);
+  QString dashboardMain() const noexcept { return dashboard_main_; }
+  void setDashboardMain(const QString &main);
+  QString dashboardScreensaver() const noexcept {
+    return dashboard_screensaver_;
+  }
+  void setDashboardScreensaver(const QString &screensaver);
+  QString customScreensaver() const noexcept { return custom_screensaver_; }
+  void setCustomScreensaver(const QString &screensaver);
+  QString screensaverFile() const noexcept { return screensaver_file_; }
   QString hassDashboardsUrl() const;
 
   bool screensaverActive() const noexcept { return screensaver_active_; }
@@ -262,7 +284,8 @@ private:
   QHash<QString, QString> bundled_config_;
   QString hass_url_;
   QString hass_token_;
-  // Recomputes dashboard_url_ from the source, emitting dashboardUrlChanged
+  // Recomputes dashboard_url_ and screensaver_file_ from the source, emitting
+  // dashboardUrlChanged
   // when it changed.
   void updateDashboardUrl();
 
@@ -270,6 +293,10 @@ private:
   QString dashboard_source_;
   QString custom_dashboard_url_;
   QString dashboard_config_;
+  QString dashboard_main_;
+  QString dashboard_screensaver_;
+  QString custom_screensaver_;
+  QString screensaver_file_;
   QString mqtt_broker_host_;
   int mqtt_broker_port_{1883};
   QString mqtt_username_;

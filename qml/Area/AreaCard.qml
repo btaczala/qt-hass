@@ -8,6 +8,7 @@ import QtQuick.Controls.Material
 
 import QtHomeAssistant
 import "../Cameras/CameraUrls.js" as CameraUrls
+import "../Dashboard/DashboardNavigation.js" as DashboardNavigation
 
 // A Home Assistant Lovelace area card: a header with the area's picture (or
 // its icon), its name and a line of sensors, over tiles for the entities it
@@ -23,12 +24,18 @@ import "../Cameras/CameraUrls.js" as CameraUrls
 //         ]
 //     }
 //
-// A sensor is an entity id, or { entityId, icon }. A control is an entity id,
-// or { entityId, name, icon, iconOnly, tapAction, holdAction }: its Tile runs
+// A sensor is an entity id, or { entityId, icon, showIcon, attribute, suffix,
+// stateStyles } (see AreaSensor). A control is an entity id, or
+// { entityId, name, icon, iconOnly, tapAction, holdAction }: its Tile runs
 // tapAction on a tap anywhere, the icon included -- "more-info" (the default)
 // or "toggle" -- and holdAction ("none" by default) on a hold. name replaces
 // the entity's friendly name; iconOnly controls drop the name and state and
 // sit in a row of icons above the other tiles.
+//
+// Tapping the header (not one of its sensors, which open their details) runs
+// the card's tapAction: "none" (the default), a function, or
+// { action: "navigate", page: "LivingRoom.qml" } for the dashboard's page
+// with that source (see Dashboard.showPage).
 Pane {
     id: root
 
@@ -47,6 +54,11 @@ Pane {
 
     property var sensors: []
     property var controls: []
+    // Leaves out sensors and controls whose entity is unavailable, unknown or
+    // missing.
+    property bool hideUnavailable: false
+    // See above.
+    property var tapAction: "none"
 
     property real headerHeight: 160
     // Tiles are laid out in as many columns of at least this width as fit.
@@ -92,6 +104,7 @@ Pane {
 
         required property var config
         property color tint
+        property bool hideUnavailable
 
         entityId: tile.config.entityId
         name: tile.config.name ?? ""
@@ -100,8 +113,39 @@ Pane {
         tapAction: tile.config.tapAction ?? "more-info"
         iconTapAction: tile.tapAction
         holdAction: tile.config.holdAction ?? "none"
+        visible: !tile.hideUnavailable || !["unavailable", "unknown"].includes(tile.entityState)
         Material.elevation: 0
         Material.background: tile.tint
+    }
+
+    function performAction(action) {
+        if (typeof action === "function") {
+            action();
+            return;
+        }
+        const config = typeof action === "string" ? {
+            action: action
+        } : action ?? {
+            action: "none"
+        };
+        switch (config.action) {
+        case "navigate":
+            DashboardNavigation.navigate(root, config.page);
+            break;
+        case "none":
+            break;
+        default:
+            console.warn(`AreaCard: unsupported action "${config.action}" for ${root.areaId}`);
+        }
+    }
+
+    function isOnSensor(position) {
+        for (let i = 0; i < sensorRepeater.count; ++i) {
+            const sensor = sensorRepeater.itemAt(i);
+            if (sensor?.visible && sensor.contains(sensor.mapFromItem(header, position)))
+                return true;
+        }
+        return false;
     }
 
     function entry(config) {
@@ -127,6 +171,21 @@ Pane {
 
             Layout.fillWidth: true
             Layout.preferredHeight: root.headerHeight
+
+            // One handler for the header, sensors included: nested TapHandlers
+            // only grab passively, so a sensor's own would fire along with it.
+            TapHandler {
+                enabled: root.tapAction !== "none"
+                onTapped: eventPoint => {
+                    if (!root.isOnSensor(eventPoint.pressPosition))
+                        root.performAction(root.tapAction);
+                }
+            }
+
+            HoverHandler {
+                enabled: root.tapAction !== "none"
+                cursorShape: Qt.PointingHandCursor
+            }
 
             layer.enabled: root.roundCorners
             layer.effect: MultiEffect {
@@ -216,12 +275,19 @@ Pane {
                     spacing: 12
 
                     Repeater {
+                        id: sensorRepeater
                         model: root.sensors
 
                         AreaSensor {
                             required property var modelData
-                            entityId: root.entry(modelData).entityId
-                            icon: root.entry(modelData).icon ?? ""
+                            readonly property var config: root.entry(modelData)
+                            entityId: config.entityId
+                            icon: config.icon ?? ""
+                            showIcon: config.showIcon ?? true
+                            attribute: config.attribute ?? ""
+                            suffix: config.suffix ?? ""
+                            stateStyles: config.stateStyles ?? {}
+                            hideUnavailable: root.hideUnavailable
                             color: root.headerForeground
                         }
                     }
@@ -249,6 +315,7 @@ Pane {
                         required property var modelData
                         config: modelData
                         tint: root.tileBackground
+                        hideUnavailable: root.hideUnavailable
                     }
                 }
             }
@@ -269,6 +336,7 @@ Pane {
                         Layout.fillWidth: true
                         config: modelData
                         tint: root.tileBackground
+                        hideUnavailable: root.hideUnavailable
                     }
                 }
             }

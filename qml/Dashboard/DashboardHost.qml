@@ -5,7 +5,8 @@ import QtQuick.Controls
 
 import QtHomeAssistant
 
-// The user's dashboard on the main screen. DashboardSync downloads it from
+// The user's dashboard on the main screen. DashboardSync downloads it (and
+// the screensaver next to it, Controler.screensaverFile) from
 // Controler.dashboardUrl each time the app connects and on reload(); it is
 // loaded from that local copy (the last good one when a download fails) and
 // shown while `active`. Without a dashboard -- none defined, still loading, a
@@ -43,7 +44,7 @@ Item {
     // hasn't changed.
     function reload() {
         root.reloadPending = true;
-        DashboardSync.sync(Controler.dashboardUrl);
+        DashboardSync.sync(Controler.dashboardUrl, Controler.screensaverFile);
     }
 
     // The compiled dashboard, once DashboardSync.localUrl has loaded.
@@ -77,12 +78,12 @@ Item {
     }
 
     onActiveChanged: if (root.active)
-        DashboardSync.sync(Controler.dashboardUrl)
+        DashboardSync.sync(Controler.dashboardUrl, Controler.screensaverFile)
 
     Component.onCompleted: {
         root.load();
         if (root.active)
-            DashboardSync.sync(Controler.dashboardUrl);
+            DashboardSync.sync(Controler.dashboardUrl, Controler.screensaverFile);
     }
 
     Connections {

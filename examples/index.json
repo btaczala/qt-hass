@@ -1,1 +1,8 @@
-["office-panel", "area-panel"]
+[
+    "office-panel",
+    {
+        "name": "area-panel",
+        "main": "main.qml",
+        "screensaver": "AreaScreensaver.qml"
+    }
+]

@@ -30,6 +30,10 @@ const auto kHassTokenKey = QStringLiteral("connection/token");
 const auto kDashboardUrlKey = QStringLiteral("dashboard/url");
 const auto kDashboardSourceKey = QStringLiteral("dashboard/source");
 const auto kDashboardConfigKey = QStringLiteral("dashboard/config");
+const auto kDashboardMainKey = QStringLiteral("dashboard/main");
+const auto kDashboardScreensaverKey = QStringLiteral("dashboard/screensaver");
+const auto kCustomScreensaverKey = QStringLiteral("dashboard/customScreensaver");
+const auto kDefaultDashboardMain = QStringLiteral("main.qml");
 const auto kDashboardSourceHass = QStringLiteral("hass");
 const auto kDashboardSourceUrl = QStringLiteral("url");
 const auto kIdleTimeoutKey = QStringLiteral("idleTimeout");
@@ -82,6 +86,11 @@ Controler::Controler(QObject *parent)
         settings.value(kDashboardUrlKey, bundledValue("DASHBOARD_URL"))
             .toString();
     dashboard_config_ = settings.value(kDashboardConfigKey).toString();
+    dashboard_main_ =
+        settings.value(kDashboardMainKey, kDefaultDashboardMain).toString();
+    dashboard_screensaver_ =
+        settings.value(kDashboardScreensaverKey).toString();
+    custom_screensaver_ = settings.value(kCustomScreensaverKey).toString();
   }
   updateDashboardUrl();
   // The Home Assistant www URL follows the connection's.
@@ -347,6 +356,34 @@ void Controler::setDashboardConfig(const QString &config) {
   updateDashboardUrl();
 }
 
+void Controler::setDashboardMain(const QString &main) {
+  const QString valid = main.isEmpty() ? kDefaultDashboardMain : main;
+  if (valid == dashboard_main_)
+    return;
+  dashboard_main_ = valid;
+  QSettings{}.setValue(kDashboardMainKey, valid);
+  Q_EMIT dashboardSourceChanged();
+  updateDashboardUrl();
+}
+
+void Controler::setDashboardScreensaver(const QString &screensaver) {
+  if (screensaver == dashboard_screensaver_)
+    return;
+  dashboard_screensaver_ = screensaver;
+  QSettings{}.setValue(kDashboardScreensaverKey, screensaver);
+  Q_EMIT dashboardSourceChanged();
+  updateDashboardUrl();
+}
+
+void Controler::setCustomScreensaver(const QString &screensaver) {
+  if (screensaver == custom_screensaver_)
+    return;
+  custom_screensaver_ = screensaver;
+  QSettings{}.setValue(kCustomScreensaverKey, screensaver);
+  Q_EMIT dashboardSourceChanged();
+  updateDashboardUrl();
+}
+
 QString Controler::hassDashboardsUrl() const {
   QUrl url(hass_url_);
   if (url.scheme() == u"ws")
@@ -366,17 +403,25 @@ QString Controler::hassDashboardsUrl() const {
 
 void Controler::updateDashboardUrl() {
   QString url = custom_dashboard_url_;
+  QString screensaver = custom_screensaver_;
   if (dashboard_source_ == kDashboardSourceHass) {
     const QString base = hassDashboardsUrl();
     url = base.isEmpty() || dashboard_config_.isEmpty()
               ? QString{}
-              : base + QString::fromUtf8(QUrl::toPercentEncoding(
-                           dashboard_config_)) +
-                    QStringLiteral("/main.qml");
+              : base +
+                    QString::fromUtf8(
+                        QUrl::toPercentEncoding(dashboard_config_)) +
+                    u'/' +
+                    QString::fromUtf8(
+                        QUrl::toPercentEncoding(dashboard_main_, "/"));
+    screensaver = dashboard_screensaver_;
   }
-  if (url == dashboard_url_)
+  if (url.isEmpty())
+    screensaver.clear();
+  if (url == dashboard_url_ && screensaver == screensaver_file_)
     return;
   dashboard_url_ = url;
+  screensaver_file_ = screensaver;
   Q_EMIT dashboardUrlChanged();
 }
 

@@ -17,8 +17,9 @@ gradle_cache_volume := "qthass-gradle-cache"
 
 # Where dashboards go: an ssh host (~/.ssh/config) and Home Assistant's
 # /config/www/qthass/, served at http://<hass>:8123/local/qthass/. Each
-# dashboard gets its own folder there; examples/index.json lists them for the
-# app's settings when the dashboard source is "Home Assistant www folder".
+# dashboard gets its own folder there; examples/index.json lists them, with
+# their main and screensaver files, for the app's settings when the dashboard
+# source is "Home Assistant www folder".
 hass_ssh := "hass"
 hass_dashboard_dir := "/config/www/qthass"
 
@@ -27,30 +28,43 @@ dashboard-sync *examples:
     #!/usr/bin/env bash
     set -euo pipefail
     cd "{{ justfile_directory() }}/examples"
+    # Home Assistant serves www files but not folder listings (403 for
+    # /local/qthass/), so the app's settings list the dashboards from
+    # examples/index.json, kept by hand: an entry per folder, its name (a
+    # dashboard in main.qml) or {"name", "main", "screensaver"}. It's checked
+    # first, and all dashboards means the ones it lists.
+    listed="$(python3 - <<'EOF'
+    import json, os, sys
+    entries = json.load(open("index.json"))
+    if not isinstance(entries, list):
+        sys.exit("examples/index.json must be a JSON array")
+    problems = []
+    for entry in entries:
+        if isinstance(entry, str):
+            entry = {"name": entry}
+        name = entry.get("name") if isinstance(entry, dict) else None
+        if not isinstance(name, str) or not name:
+            problems.append(f"an entry without a name: {json.dumps(entry)}")
+            continue
+        for key in ("main", "screensaver"):
+            file = entry.get(key) or ("main.qml" if key == "main" else "")
+            if file and not os.path.isfile(os.path.join(name, file)):
+                problems.append(f"{name}: no {key} file {file}")
+        print(name)
+    if problems:
+        sys.exit("examples/index.json: " + "; ".join(problems))
+    EOF
+    )"
     names=({{ examples }})
     if [ ${#names[@]} -eq 0 ]; then
-      for dir in */; do
-        [ -f "$dir/main.qml" ] && names+=("${dir%/}")
-      done
+      names=($listed)
     fi
     for name in "${names[@]}"; do
-      if [ ! -f "$name/main.qml" ]; then
-        echo "no dashboard at examples/$name (expected a main.qml)" >&2
+      if [ ! -d "$name" ]; then
+        echo "no dashboard at examples/$name" >&2
         exit 1
       fi
     done
-    # Home Assistant serves www files but not folder listings (403 for
-    # /local/qthass/), so the app's settings list the dashboards from
-    # examples/index.json, a JSON array of folder names kept by hand.
-    python3 - <<'EOF'
-    import json, os, sys
-    names = json.load(open("index.json"))
-    if not isinstance(names, list) or not all(isinstance(n, str) for n in names):
-        sys.exit("examples/index.json must be a JSON array of folder names")
-    missing = [n for n in names if not os.path.isfile(os.path.join(n, "main.qml"))]
-    if missing:
-        sys.exit("examples/index.json lists folders without a main.qml: " + ", ".join(missing))
-    EOF
     # Homebrew's rsync, not macOS's own (openrsync), which lacks --mkpath.
     rsync="$(brew --prefix)/bin/rsync"
     if [ ! -x "$rsync" ]; then

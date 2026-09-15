@@ -28,6 +28,12 @@ Popup {
     // The listed dashboards, plus the chosen one when the list lacks it (e.g.
     // it couldn't be read), so the choice still shows.
     readonly property var dashboardConfigs: root.dashboardConfig === "" || hassDashboards.names.includes(root.dashboardConfig) ? hassDashboards.names : [root.dashboardConfig].concat(hassDashboards.names)
+    // The chosen dashboard's files, from its index.json entry; the saved ones
+    // while the list lacks it.
+    readonly property var dashboardEntry: hassDashboards.entry(root.dashboardConfig)
+    readonly property bool savedConfig: root.dashboardConfig === Controler.dashboardConfig
+    readonly property string dashboardMain: root.dashboardEntry?.main ?? (root.savedConfig ? Controler.dashboardMain : "main.qml")
+    readonly property string dashboardScreensaver: root.dashboardEntry?.screensaver ?? (root.savedConfig ? Controler.dashboardScreensaver : "")
 
     // Asks the app to load the dashboard again, from Controler.dashboardUrl.
     signal reloadDashboardRequested
@@ -41,6 +47,7 @@ Popup {
         root.dashboardSource = Controler.dashboardSource;
         root.dashboardConfig = Controler.dashboardConfig;
         dashboardUrlField.text = Controler.customDashboardUrl;
+        screensaverField.text = Controler.customScreensaver;
         if (root.dashboardSource === "hass")
             hassDashboards.refresh();
         mqttHostField.text = Controler.mqttBrokerHost;
@@ -238,7 +245,7 @@ Popup {
                     }
                 }
 
-                // A dashboard from /config/www/qthass/<name>/main.qml.
+                // A dashboard from /config/www/qthass/<name>/, as index.json lists it.
                 RowLayout {
                     Layout.fillWidth: true
                     visible: root.dashboardSource === "hass"
@@ -269,7 +276,16 @@ Popup {
                 Label {
                     Layout.fillWidth: true
                     visible: root.dashboardSource === "hass"
-                    text: hassDashboards.loading ? qsTr("Reading /config/www/qthass/index.json...") : hassDashboards.error !== "" ? hassDashboards.error : root.dashboardConfig !== "" ? Controler.hassDashboardsUrl + root.dashboardConfig + "/main.qml" : qsTr("Folders of /config/www/qthass/ with a main.qml, as listed in its index.json.")
+                    text: {
+                        if (hassDashboards.loading)
+                            return qsTr("Reading /config/www/qthass/index.json...");
+                        if (hassDashboards.error !== "")
+                            return hassDashboards.error;
+                        if (root.dashboardConfig === "")
+                            return qsTr("Folders of /config/www/qthass/, as listed in its index.json.");
+                        const url = Controler.hassDashboardsUrl + root.dashboardConfig + "/" + root.dashboardMain;
+                        return root.dashboardScreensaver !== "" ? qsTr("%1\nScreensaver: %2").arg(url).arg(root.dashboardScreensaver) : url;
+                    }
                     wrapMode: Text.WrapAnywhere
                     font.pixelSize: 12
                     color: hassDashboards.error !== "" ? root.Material.color(Material.Red, Material.Shade300) : root.Material.hintTextColor
@@ -280,6 +296,15 @@ Popup {
                     Layout.fillWidth: true
                     visible: root.dashboardSource === "url"
                     placeholderText: qsTr("URL, e.g. http://homeassistant.local:8123/local/qthass/main.qml")
+                    inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
+                }
+
+                // Empty for the built-in screensaver.
+                TextField {
+                    id: screensaverField
+                    Layout.fillWidth: true
+                    visible: root.dashboardSource === "url"
+                    placeholderText: qsTr("Screensaver file next to it (optional), e.g. MyScreensaver.qml")
                     inputMethodHints: Qt.ImhUrlCharactersOnly | Qt.ImhNoAutoUppercase | Qt.ImhNoPredictiveText
                 }
 
@@ -297,18 +322,26 @@ Popup {
                     // loaded again from scratch, and the settings close to show it.
                     Button {
                         readonly property bool hass: root.dashboardSource === "hass"
-                        readonly property bool edited: root.dashboardSource !== Controler.dashboardSource || (hass ? root.dashboardConfig !== Controler.dashboardConfig : dashboardUrlField.text.trim() !== Controler.customDashboardUrl)
+                        readonly property bool edited: root.dashboardSource !== Controler.dashboardSource || (hass ? root.dashboardConfig !== Controler.dashboardConfig || root.dashboardMain !== Controler.dashboardMain || root.dashboardScreensaver !== Controler.dashboardScreensaver : dashboardUrlField.text.trim() !== Controler.customDashboardUrl || screensaverField.text.trim() !== Controler.customScreensaver)
 
                         text: edited ? qsTr("Save and reload") : qsTr("Reload")
                         enabled: hass ? root.dashboardConfig !== "" : dashboardUrlField.text.trim() !== "" || edited
                         highlighted: true
                         onClicked: {
                             Controler.dashboardSource = root.dashboardSource;
-                            if (hass)
+                            if (hass) {
+                                // Read before dashboardConfig changes savedConfig.
+                                const main = root.dashboardMain;
+                                const screensaver = root.dashboardScreensaver;
                                 Controler.dashboardConfig = root.dashboardConfig;
-                            else
+                                Controler.dashboardMain = main;
+                                Controler.dashboardScreensaver = screensaver;
+                            } else {
                                 Controler.customDashboardUrl = dashboardUrlField.text.trim();
+                                Controler.customScreensaver = screensaverField.text.trim();
+                            }
                             dashboardUrlField.text = Controler.customDashboardUrl;
+                            screensaverField.text = Controler.customScreensaver;
                             root.reloadDashboardRequested();
                             root.close();
                         }

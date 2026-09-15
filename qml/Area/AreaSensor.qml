@@ -11,13 +11,35 @@ import QtHomeAssistant
 // unit. Tapping it opens the entity's details.
 //
 //     AreaSensor { entityId: "sensor.office_temperature" }
+//     AreaSensor {
+//         entityId: "climate.living_room"
+//         attribute: "current_temperature"
+//         suffix: "°C"
+//     }
+//     AreaSensor {
+//         entityId: "binary_sensor.car_in_garage"
+//         stateStyles: ({ on: { icon: "mdi:car", color: "green" }, off: { icon: "mdi:car", color: "red" } })
+//     }
 RowLayout {
     id: root
 
     required property string entityId
     // Empty means the entity's own icon, else one for its device class.
     property string icon
+    property bool showIcon: true
     property color color: root.Material.foreground
+    // Shows this attribute instead of the state.
+    property string attribute
+    // In place of the unit.
+    property string suffix
+    // Per state (raw, e.g. "on"): { icon, color } for the icon instead of the usual.
+    property var stateStyles: ({})
+    // Hidden while the entity (or its attribute) is unavailable or unknown.
+    property bool hideUnavailable: false
+
+    readonly property var stateStyle: root.stateStyles[entity.state] ?? ({})
+    readonly property var rawValue: root.attribute !== "" ? entity.attributes[root.attribute] : entity.state
+    readonly property bool available: entity.available && root.rawValue !== undefined && root.rawValue !== null
 
     readonly property string domain: root.entityId.split(".")[0]
     readonly property string deviceClass: entity.attributes.device_class ?? ""
@@ -59,10 +81,17 @@ RowLayout {
             window: [qsTr("Closed"), qsTr("Open")]
         })
 
+    // Only MDI icons draw, not ones from other sets (e.g. "phu:").
+    function isMdi(icon) {
+        return !!icon && (!icon.includes(":") || icon.startsWith("mdi:"));
+    }
+
     readonly property string resolvedIcon: {
+        if (root.isMdi(root.stateStyle.icon))
+            return root.stateStyle.icon;
         if (root.icon)
             return root.icon;
-        if (entity.attributes.icon)
+        if (root.isMdi(entity.attributes.icon))
             return entity.attributes.icon;
         if (root.domain === "binary_sensor")
             return root.binarySensorIcons[root.deviceClass]?.[entity.state === "on" ? 1 : 0] ?? (entity.state === "on" ? "mdi:checkbox-marked-circle" : "mdi:radiobox-blank");
@@ -76,19 +105,25 @@ RowLayout {
             return qsTr("Unavailable");
         if (entity.state === "unknown")
             return qsTr("Unknown");
-        if (root.domain === "binary_sensor")
+        if (root.domain === "binary_sensor" && root.attribute === "")
             return root.binarySensorLabels[root.deviceClass]?.[entity.state === "on" ? 1 : 0] ?? (entity.state === "on" ? qsTr("On") : qsTr("Off"));
-        const unit = entity.attributes.unit_of_measurement ?? "";
-        let text = entity.state;
-        if (!isNaN(entity.value)) {
+        const unit = root.suffix || (root.attribute === "" ? entity.attributes.unit_of_measurement ?? "" : "");
+        let text = String(root.rawValue ?? "");
+        const number = text === "" ? NaN : Number(text);
+        if (isNaN(number)) {
+            // Raw states read like HA's: "charging_completed" as "Charging completed".
+            text = text.replace(/_/g, " ");
+            text = text.charAt(0).toUpperCase() + text.slice(1);
+        } else {
             // Readings like 25.300001: at most two decimals, trailing zeros dropped.
-            const rounded = Math.round(entity.value * 100) / 100;
+            const rounded = Math.round(number * 100) / 100;
             const decimals = Math.min(2, String(rounded).split(".")[1]?.length ?? 0);
             text = rounded.toLocaleString(Qt.locale(), "f", decimals);
         }
         return unit ? qsTr("%1 %2").arg(text).arg(unit) : text;
     }
 
+    visible: !root.hideUnavailable || root.available
     spacing: 4
 
     HassEntity {
@@ -101,9 +136,10 @@ RowLayout {
     }
 
     MdiIcon {
+        visible: root.showIcon
         icon: root.resolvedIcon
         iconSize: 18
-        color: root.color
+        color: root.stateStyle.color ?? root.color
     }
 
     Label {

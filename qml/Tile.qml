@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Controls.Material
 
 import QtHomeAssistant
+import "Dashboard/DashboardNavigation.js" as DashboardNavigation
 
 // A Home Assistant Lovelace tile card: the entity's icon in a state-tinted
 // circle, its name and state, and an optional stack of features underneath.
@@ -15,7 +16,9 @@ import QtHomeAssistant
 //
 // Tapping and holding run actions, as Lovelace's tap_action/hold_action do.
 // Each is an action name ("more-info", "toggle", "none"), an object
-// ({ action: "more-info", entity: "sensor.other" }) or a function:
+// ({ action: "more-info", entity: "sensor.other" }, or
+// { action: "navigate", page: "LivingRoom.qml" } for a page of the dashboard
+// with that source, see Dashboard.showPage) or a function:
 //
 //     Tile {
 //         entityId: "light.desk"
@@ -101,13 +104,27 @@ EntityBase {
     // [resting, active] icons for domains Home Assistant draws per state.
     readonly property var domainIcons: ({
         alarm_control_panel: ["mdi:shield-off", "mdi:shield-lock"],
+        cover: ["mdi:window-shutter", "mdi:window-shutter-open"],
         fan: ["mdi:fan-off", "mdi:fan"],
         input_boolean: ["mdi:toggle-switch-off-outline", "mdi:toggle-switch-outline"],
         light: ["mdi:lightbulb-off", "mdi:lightbulb"],
         lock: ["mdi:lock", "mdi:lock-open-variant"],
+        media_player: ["mdi:cast", "mdi:cast-connected"],
         switch: ["mdi:toggle-switch-variant-off", "mdi:toggle-switch-variant"]
     })
-    readonly property string resolvedIcon: root.icon || root.attributes.icon || (root.domainIcons[root.domain]?.[root.isActive ? 1 : 0] ?? "mdi:bookmark")
+    // One icon for any state; not in domainIcons, whose pairs ToggleFeature
+    // draws on its off and on sides.
+    readonly property var singleDomainIcons: ({
+        climate: "mdi:thermostat",
+        lawn_mower: "mdi:robot-mower"
+    })
+    // Only MDI icons draw: an entity's icon from another set (e.g. "phu:")
+    // falls back to the domain's.
+    readonly property string entityIcon: {
+        const icon = root.attributes.icon ?? "";
+        return !icon.includes(":") || icon.startsWith("mdi:") ? icon : "";
+    }
+    readonly property string resolvedIcon: root.icon || root.entityIcon || (root.domainIcons[root.domain]?.[root.isActive ? 1 : 0] ?? root.singleDomainIcons[root.domain] ?? "mdi:bookmark")
 
     readonly property var stateLabels: ({
         on: qsTr("On"),
@@ -192,6 +209,9 @@ EntityBase {
                 console.warn(`Tile: ${root.entityId} can't be toggled`);
             else if (!root.isUnavailable)
                 root.toggle();
+            break;
+        case "navigate":
+            DashboardNavigation.navigate(root, config.page);
             break;
         case "none":
             break;
