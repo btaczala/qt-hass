@@ -8,9 +8,32 @@
 #   just android-run qt67       # adb install + launch on the connected device
 #   just android-deploy qt67    # build then run, in one step
 # ("qt610" works the same everywhere "qt67" does above.)
+#
+#   just dashboard-sync               # copy examples/office-panel to Home Assistant
+#   just dashboard-sync my-panel      # or another directory under examples/
 
 image_tag := "qthass-android"
 gradle_cache_volume := "qthass-gradle-cache"
+
+# Where dashboards go: an ssh host (~/.ssh/config) and Home Assistant's
+# /config/www/qthass/, served at http://<hass>:8123/local/qthass/.
+hass_ssh := "hass"
+hass_dashboard_dir := "/config/www/qthass/"
+
+# Copy a dashboard from examples/ into Home Assistant's www.
+dashboard-sync example="office-panel":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # The app picks it up on its next connect, or on Reload in its settings.
+    src="{{ justfile_directory() }}/examples/{{ example }}/"
+    if [ ! -f "$src/main.qml" ]; then
+      echo "no dashboard at $src (expected a main.qml)" >&2
+      exit 1
+    fi
+    # The directory's contents, not the directory: the dashboard URL points at
+    # .../local/qthass/main.qml. -rt rather than -a, so files on the server
+    # don't take this machine's user and group ids.
+    rsync -rtv --chmod=D755,F644 --exclude .DS_Store "$src" "{{ hass_ssh }}:{{ hass_dashboard_dir }}"
 
 # Build (or rebuild) the Android toolchain image for `variant`.
 android-image variant:

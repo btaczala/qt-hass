@@ -84,6 +84,10 @@ ApplicationWindow {
         onReloadDashboardRequested: dashboardHost.reload()
     }
 
+    // Entity details for the whole app, opened by Controler.requestDetails
+    // (e.g. a Tile's more-info action). Outside the dashboard, so there's one.
+    DetailsOverlay {}
+
     // First run, or set up again from the settings page.
     Loader {
         anchors.fill: parent

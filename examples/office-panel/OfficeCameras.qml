@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import QtQuick.Controls
 
 import QtHomeAssistant
 
@@ -14,6 +15,7 @@ Flickable {
     contentHeight: content.implicitHeight + 2 * content.y
     clip: true
     boundsBehavior: Flickable.StopAtBounds
+    ScrollBar.vertical: ScrollBar {}
 
     GridLayout {
         id: content

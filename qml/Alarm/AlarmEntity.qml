@@ -5,7 +5,7 @@ import QtHomeAssistant
 
 // An alarm_control_panel entity: its state as HA's frontend shows it (label,
 // icon, color), the arm modes it supports, and the services to arm and disarm
-// it. Shared by AlarmCard and AlarmPopup.
+// it. Shared by AlarmCard and AlarmControls.
 HassEntity {
     id: root
 

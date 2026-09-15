@@ -13,8 +13,20 @@ import QtHomeAssistant
 //         features: [ ToggleFeature {} ]
 //     }
 //
-// Tapping the icon toggles entities that can be toggled; tapping anywhere else
-// asks for the entity's details, like Lovelace's more-info.
+// Tapping and holding run actions, as Lovelace's tap_action/hold_action do.
+// Each is an action name ("more-info", "toggle", "none"), an object
+// ({ action: "more-info", entity: "sensor.other" }) or a function:
+//
+//     Tile {
+//         entityId: "light.desk"
+//         tapAction: "toggle"
+//         holdAction: "more-info"
+//         iconTapAction: () => HassAPI.callService("script", "turn_on", "script.desk_scene")
+//     }
+//
+// By default tapping the icon toggles entities that can be toggled, tapping
+// anywhere else opens the entity's details in the global details overlay
+// (Controler.requestDetails), and holding does nothing.
 //
 // The implicit height fits every supported feature stacked below the header.
 // Given less height than that, the tile switches to Lovelace's inline layout:
@@ -28,6 +40,14 @@ EntityBase {
     property color activeColor: "#ffc107"
     property bool vertical: false
     property bool hideState: false
+
+    // Actions, see above. The icon's own actions fall back to these when unset:
+    // iconTapAction to toggling (or more-info when the entity can't toggle),
+    // iconHoldAction to holdAction.
+    property var tapAction: "more-info"
+    property var holdAction: "none"
+    property var iconTapAction
+    property var iconHoldAction
 
     // list<Item> here, not list<TileFeature>: a list of TileFeature (a
     // composite QML type, not a C++-registered one) makes the Tile type
@@ -142,8 +162,43 @@ EntityBase {
         root.setOn(!root.isActive);
     }
 
-    function moreInfo() {
-        Controler.requestDetails(root.entityId, root.displayName);
+    // Opens the global details overlay; for another entity when given one.
+    function moreInfo(entityId) {
+        if (entityId && entityId !== root.entityId)
+            Controler.requestDetails(entityId, "");
+        else
+            Controler.requestDetails(root.entityId, root.displayName);
+    }
+
+    function performAction(action) {
+        if (typeof action === "function") {
+            action();
+            return;
+        }
+        const config = typeof action === "string" ? {
+            action: action
+        } : action ?? {
+            action: "none"
+        };
+        switch (config.action) {
+        case "more-info":
+            root.moreInfo(config.entity);
+            break;
+        case "toggle":
+            if (!root.toggleable)
+                console.warn(`Tile: ${root.entityId} can't be toggled`);
+            else if (!root.isUnavailable)
+                root.toggle();
+            break;
+        case "none":
+            break;
+        default:
+            console.warn(`Tile: unknown action "${config.action}" for ${root.entityId}`);
+        }
+    }
+
+    function isOnIcon(position) {
+        return iconCircle.contains(iconCircle.mapFromItem(root, position));
     }
 
     function placeFeatures() {
@@ -179,8 +234,25 @@ EntityBase {
             root.placeFeatures();
     }
 
+    // One handler for the whole card, the icon included: nested TapHandlers
+    // only grab passively, so one on the icon would fire along with this one.
+    // Feature controls take the press themselves and never reach it. A hold
+    // past the threshold emits longPressed and no tapped.
     TapHandler {
-        onTapped: root.moreInfo()
+        id: tapHandler
+        longPressThreshold: 0.5
+        onTapped: eventPoint => {
+            if (root.isOnIcon(eventPoint.pressPosition))
+                root.performAction(root.iconTapAction !== undefined ? root.iconTapAction : root.toggleable ? "toggle" : "more-info");
+            else
+                root.performAction(root.tapAction);
+        }
+        onLongPressed: {
+            if (root.isOnIcon(tapHandler.point.pressPosition) && root.iconHoldAction !== undefined)
+                root.performAction(root.iconHoldAction);
+            else
+                root.performAction(root.holdAction);
+        }
     }
 
     ColumnLayout {
@@ -201,6 +273,7 @@ EntityBase {
                 rowSpacing: 6
 
                 Rectangle {
+                    id: iconCircle
                     Layout.preferredWidth: 40
                     Layout.preferredHeight: 40
                     Layout.alignment: Qt.AlignCenter
@@ -213,10 +286,8 @@ EntityBase {
                         color: root.stateColor
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
+                    HoverHandler {
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.toggleable ? root.toggle() : root.moreInfo()
                     }
                 }
 

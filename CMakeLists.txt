@@ -117,7 +117,7 @@ qt_add_qml_module(
   qml/Screensaver.qml
   qml/Alarm/AlarmCard.qml
   qml/Alarm/AlarmEntity.qml
-  qml/Alarm/AlarmPopup.qml
+  qml/Alarm/AlarmControls.qml
   qml/Clock.qml
   qml/SystemTray/SystemTray.qml
   qml/SystemTray/SystemTrayIndicators.qml
@@ -130,6 +130,11 @@ qt_add_qml_module(
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
   qml/Features/ButtonsFeature.qml
+  qml/Details/DetailsOverlay.qml
+  qml/Details/DetailsAttributes.qml
+  qml/Details/HistoryPanel.qml
+  qml/Details/SensorHistory.qml
+  qml/Details/BinarySensorHistory.qml
   qml/Dashboard/Dashboard.qml
   qml/Dashboard/DashboardPage.qml
   qml/Dashboard/DashboardOverlay.qml
