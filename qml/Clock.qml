@@ -7,8 +7,9 @@ import QtHomeAssistant
 
 // Time and date, by default in dim greys for dark full-screen overlays (Screensaver,
 // DoNotDisturb). Ticks only while visible; minutePassed() fires on each new
-// minute, e.g. to move the clock around. With showWeather, the current
-// weather's icon sits next to the time; tapping it opens a WeatherCard.
+// minute, e.g. to move the clock around. With showWeather and a weatherEntity,
+// the current weather's icon sits next to the time; tapping it opens a
+// WeatherCard.
 Column {
     id: root
 
@@ -19,7 +20,7 @@ Column {
     property color dateColor: "#808080"
     property bool showDate: true
     property bool showWeather: true
-    property string weatherEntity: "weather.pirateweather"
+    property string weatherEntity
 
     signal minutePassed
 
@@ -44,7 +45,7 @@ Column {
 
         Loader {
             anchors.verticalCenter: time.verticalCenter
-            active: root.showWeather
+            active: root.showWeather && root.weatherEntity !== ""
             visible: active
 
             sourceComponent: WeatherIcon {

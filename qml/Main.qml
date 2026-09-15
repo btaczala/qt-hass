@@ -29,46 +29,59 @@ ApplicationWindow {
         }
     }
 
-    // Outside the dashboard Loader on purpose: settings have to be reachable
-    // before the first successful connection, e.g. to fix a wrong URL.
-    Drawer {
-        id: drawer
-        width: Math.min(window.width * 0.85, 420)
-        height: window.height
-
-        onOpened: settingsPage.reset()
-
-        contentItem: SettingsPage {
-            id: settingsPage
-            settings: uiSettings
-        }
-    }
-
     BusyIndicator {
         anchors.centerIn: parent
         visible: !HassAPI.connected && Controler.setupCompleted
     }
 
-    Loader {
-        id: dashboardLoader
-        active: HassAPI.connected && Controler.setupCompleted
+    // The user's dashboard, from Controler.dashboardUrl; only while connected,
+    // so no entity components exist until auth succeeds.
+    DashboardHost {
+        id: dashboardHost
         anchors.fill: parent
-        sourceComponent: Dashboard {
-            // "auto": along the short side, so the pages keep the long one.
-            navPosition: uiSettings.navPosition !== "auto" ? uiSettings.navPosition : window.width > window.height ? "left" : "top"
-            onMenuRequested: drawer.open()
-        }
+        active: HassAPI.connected && Controler.setupCompleted
+        // "auto": along the short side, so the pages keep the long one.
+        navPosition: uiSettings.navPosition !== "auto" ? uiSettings.navPosition : window.width > window.height ? "left" : "top"
+        onSettingsRequested: settingsPage.open()
+    }
+
+    // Like a status bar, which Android hides in full screen. The navigation bar
+    // is centered along its edge, so this corner stays clear of it.
+    HassAlerts {
+        id: hassAlerts
+        watchNotifications: Controler.setupCompleted && uiSettings.showNotifications
+        watchSettingsAlerts: Controler.setupCompleted && uiSettings.showSettingsAlerts
+    }
+
+    SystemTray {
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: 8
+        showBattery: Controler.batterySupported && uiSettings.showBattery
+        alerts: hassAlerts
+        showNotifications: uiSettings.showNotifications
+        showSettingsAlerts: uiSettings.showSettingsAlerts
+        expandable: true
     }
 
     // The dashboard's navigation bar has its own settings button; this one is
     // for while there's no dashboard, e.g. to fix a wrong URL.
     ToolButton {
         id: menuButton
-        visible: dashboardLoader.status !== Loader.Ready
+        visible: !dashboardHost.dashboard
         contentItem: MdiIcon {
             icon: "mdi:menu"
         }
-        onClicked: drawer.open()
+        onClicked: settingsPage.open()
+    }
+
+    // Outside the dashboard Loader on purpose: settings have to be reachable
+    // before the first successful connection, e.g. to fix a wrong URL.
+    SettingsPage {
+        id: settingsPage
+        settings: uiSettings
+        dashboardStatus: dashboardHost.statusText
+        onReloadDashboardRequested: dashboardHost.reload()
     }
 
     // First run, or set up again from the settings page.
@@ -80,22 +93,13 @@ ApplicationWindow {
 
     Screensaver {
         visible: Controler.screensaverActive
-        weatherEntity: "weather.pirateweather"
-        // The same sensors as the list at the top of Dashboard/PageEnergy.qml.
-        energyEntities: ({
-                solarPower: "sensor.selfa_inverter_pv_input_power",
-                homePower: "sensor.selfa_inverter_home_power",
-                gridPower: "sensor.selfa_inverter_grid_meter_power_inverted",
-                batteryPower: "sensor.selfa_inverter_battery_power",
-                batterySoc: "sensor.selfa_inverter_battery_soc",
-                solarEnergyToday: "sensor.selfa_inverter_daily_pv_generation",
-                homeEnergyToday: "sensor.selfa_inverter_daily_load_consumption",
-                solarForecastToday: "sensor.solcast_pv_forecast_prognoza_na_dzisiaj"
-            })
-    }
-
-    DoNotDisturb {
-        entityId: "input_boolean.bartek_nie_przeszkadac"
+        showBattery: Controler.batterySupported && uiSettings.showBattery
+        alerts: hassAlerts
+        showNotifications: uiSettings.showNotifications
+        showSettingsAlerts: uiSettings.showSettingsAlerts
+        // Whatever the loaded dashboard asks for.
+        weatherEntity: dashboardHost.dashboard?.screensaverWeatherEntity ?? ""
+        energyEntities: dashboardHost.dashboard?.screensaverEnergyEntities ?? null
     }
 
     // Until set up, the wizard connects once it has a token.
@@ -113,7 +117,7 @@ ApplicationWindow {
         target: Controler
         function onSetupCompletedChanged() {
             if (!Controler.setupCompleted)
-                drawer.close();
+                settingsPage.close();
         }
     }
 }

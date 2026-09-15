@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(
   QtHomeAssistant
-  VERSION 0.1
+  VERSION 0.2
   LANGUAGES CXX)
 
 set(CMAKE_AUTOMOC ON)
@@ -85,7 +85,7 @@ elseif(CONFIG_ERROR)
   message(WARNING "${CONFIG_ERROR}")
 endif()
 
-qt_add_executable(qthomeassistant src/main.cpp)
+qt_add_executable(qthomeassistant src/main.cpp src/remoteadmin.h src/remoteadmin.cpp)
 
 qt_add_qml_module(
   qthomeassistant
@@ -102,6 +102,8 @@ qt_add_qml_module(
   controller.cpp
   src/mdi.h
   src/mdi.cpp
+  src/dashboardsync.h
+  src/dashboardsync.cpp
   QML_FILES
   qml/Main.qml
   qml/AnimatedBackground.qml
@@ -117,16 +119,22 @@ qt_add_qml_module(
   qml/Alarm/AlarmEntity.qml
   qml/Alarm/AlarmPopup.qml
   qml/Clock.qml
-  qml/DoNotDisturb.qml
+  qml/SystemTray/SystemTray.qml
+  qml/SystemTray/SystemTrayIndicators.qml
+  qml/SystemTray/BatteryIndicator.qml
+  qml/SystemTray/CountIndicator.qml
+  qml/SystemTray/HassAlerts.qml
+  qml/SystemTray/SystemTrayPanel.qml
   qml/Cards/Weather.qml
   qml/Cards/ButtonCard.qml
   qml/Features/ToggleFeature.qml
   qml/Features/LightBrightnessFeature.qml
   qml/Features/ButtonsFeature.qml
   qml/Dashboard/Dashboard.qml
-  qml/Dashboard/PageOverview.qml
-  qml/Dashboard/PageEnergy.qml
-  qml/Dashboard/PageCameras.qml
+  qml/Dashboard/DashboardPage.qml
+  qml/Dashboard/DashboardOverlay.qml
+  qml/Dashboard/DashboardMessage.qml
+  qml/Dashboard/DashboardHost.qml
   qml/Cameras/CameraCard.qml
   qml/Cameras/CameraDetails.qml
   qml/Cameras/CameraSensors.qml
@@ -138,6 +146,7 @@ qt_add_qml_module(
   qml/Energy/EnergyNode.qml
   qml/Energy/EnergySummary.qml
   qml/Energy/HassEnergySource.qml
+  qml/Energy/EnergyFlowPage.qml
   qml/Energy/Details/EnergyDetailPopup.qml
   qml/Energy/Details/EnergyChartView.qml
   qml/Energy/Details/EnergyValueAxis.qml
@@ -171,9 +180,6 @@ qt_add_qml_module(
   images/screensaver.gif
   images/noise.png)
 
-# Qt only looks for the Controls configuration at :/qtquickcontrols2.conf, and
-# qt_add_qml_module pins its RESOURCES under RESOURCE_PREFIX/URI -- so this file
-# has to be added separately or the Material style silently never activates.
 qt_add_resources(qthomeassistant "controls_conf" PREFIX "/" FILES
                  qtquickcontrols2.conf)
 
@@ -193,16 +199,8 @@ target_link_libraries(
   qthomeassistant PRIVATE Qt6::Gui Qt6::Quick Qt6::Multimedia Qt6::WebSockets
                           Qt6::QuickControls2 Qt6::Network Qt6::Widgets Qt6::Charts)
 
-# Plain QObjects, not QML types -- unlike hassapi.cpp/controller.cpp (which
-# are QML_SINGLETONs and belong in qt_add_qml_module's SOURCES above), the
-# remote admin server and MQTT publisher have no QML surface.
-target_sources(qthomeassistant PRIVATE remoteadmin.h remoteadmin.cpp)
+target_sources(qthomeassistant PRIVATE )
 
-# Qt MQTT has no prebuilt package for this project's kits and has to be built
-# from source (see CLAUDE.md), so it's optional: without it the app builds
-# without MqttPublisher, and RemoteAdmin reports MQTT as disabled.
-# Qt Shader Tools is optional too: with it AnimatedBackground draws a dithered
-# shader gradient, without it a plain gradient with a noise overlay.
 if(COMMAND qt_add_shaders)
   qt_add_shaders(qthomeassistant "background_shaders" PREFIX "/res/QtHomeAssistant"
                  FILES shaders/background.frag)
@@ -221,68 +219,14 @@ else()
   message(STATUS "Qt MQTT not found: building without MQTT publishing")
 endif()
 
-# qt_add_qml_module's generated type registration includes headers by basename,
-# so src/ has to be reachable the same way the root-level headers are.
 target_include_directories(qthomeassistant PRIVATE src
                                                    ${CMAKE_CURRENT_BINARY_DIR}/generated)
 
 target_compile_definitions(qthomeassistant
                            PRIVATE APP_VERSION="${PROJECT_VERSION}")
 
-# Android doesn't expose OpenSSL to NDK apps, so QtWebSockets has no TLS backend
-# for wss:// unless we bundle it ourselves. Prebuilt from
-# https://github.com/KDAB/android_openssl (Apache-2.0), commit b71f1470, the
-# "no-asm" build it recommends for Debug. Only arm64-v8a is vendored, matching
-# the only Android ABI kit this project builds against so far; a Release
-# Android build or another ABI needs its own lib pair added under
-# android/openssl/<abi>.
-if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
-  set_target_properties(
-    qthomeassistant PROPERTIES
-    QT_ANDROID_EXTRA_LIBS
-    "${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/arm64-v8a/libcrypto_3.so;${CMAKE_CURRENT_SOURCE_DIR}/android/openssl/arm64-v8a/libssl_3.so"
-  )
-endif()
-
-if(ANDROID AND Qt6_VERSION VERSION_LESS 6.8)
-  # Qt < 6.8's Gradle templates pull AGP 7.4.1, whose bundled aapt2 can't
-  # parse the android-36 platform jar (androiddeployqt's default compileSdk,
-  # a platform much newer than AGP 7.4.1 was built for) -- aapt2 fails with
-  # "RES_TABLE_TYPE_TYPE entry offsets overlap actual entry data". Pin
-  # compileSdk down to something that AGP actually understands; 34 still
-  # covers this Qt version's targetSdk (also 34).
-  set_target_properties(qthomeassistant PROPERTIES QT_ANDROID_COMPILE_SDK_VERSION "android-34")
-endif()
-
 if(ANDROID)
-  # `cmake --build <dir> --target run`: install the just-built APK on
-  # whatever device `adb` currently targets and launch it. The package name is
-  # the org.qtproject.example.<target> androiddeployqt falls back to since
-  # nothing here sets QT_ANDROID_PACKAGE_NAME -- update it here if that ever
-  # changes. QtActivity itself is Qt's own fixed Android bindings class, not
-  # project-specific.
-  set(ANDROID_PACKAGE_NAME "org.qtproject.example.qthomeassistant")
-
-  find_program(
-    ADB_EXECUTABLE adb
-    HINTS "${ANDROID_SDK_ROOT}/platform-tools" "$ENV{ANDROID_SDK_ROOT}/platform-tools"
-  )
-  if(ADB_EXECUTABLE)
-    add_custom_target(
-      run
-      COMMAND ${ADB_EXECUTABLE} install -r
-              "${CMAKE_CURRENT_BINARY_DIR}/android-build/qthomeassistant.apk"
-      COMMAND ${ADB_EXECUTABLE} shell am start -n
-              ${ANDROID_PACKAGE_NAME}/org.qtproject.qt.android.bindings.QtActivity
-      DEPENDS qthomeassistant_make_apk
-      USES_TERMINAL
-      COMMENT "Installing and launching qthomeassistant on the connected Android device")
-  else()
-    message(
-      WARNING
-        "adb not found (checked ANDROID_SDK_ROOT/platform-tools and PATH) -- the 'run' target won't be available."
-    )
-  endif()
+  include(cmake/android.cmake)
 endif()
 
 install(

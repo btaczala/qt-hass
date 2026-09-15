@@ -1,36 +1,21 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
+
 import QtHomeAssistant
 
 // "Do not disturb" sign: the clock and a looping gif on black, covering
 // everything -- the dashboard and the screensaver alike -- whenever `entityId`
 // (e.g. an input_boolean) is on, with a button that hides it for
-// snoozeMinutes. Hiding lasts until then or
-// until the entity turns off, so the next do-not-disturb shows it again.
-Popup {
+// snoozeMinutes. Hiding lasts until then or until the entity turns off, so the
+// next do-not-disturb shows it again.
+DashboardOverlay {
     id: root
 
     required property string entityId
     property int snoozeMinutes: 1
 
-    parent: Overlay.overlay
-    x: 0
-    y: 0
-    width: parent ? parent.width : 0
-    height: parent ? parent.height : 0
-    padding: 0
-    // Above the screensaver.
-    z: 1
-
-    modal: true
-    dim: false
-    closePolicy: Popup.NoAutoClose
-    visible: entity.state === "on" && !entity.snoozed
-
-    background: Rectangle {
-        color: "black"
-    }
+    active: entity.state === "on" && !entity.snoozed
 
     HassEntity {
         id: entity

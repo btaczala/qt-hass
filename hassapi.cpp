@@ -89,6 +89,22 @@ HassAPI::HassAPI(QObject *parent)
       qCWarning(hassAPI) << "Request" << payload["id"].toInt()
                          << "failed:" << payload["error"]["message"].toString();
 
+    if (const auto subscription = subscriptions_.find(payload["id"].toInt());
+        subscription != subscriptions_.end()) {
+      // A successful result only confirms it; events follow.
+      if (success)
+        return;
+      const PendingCommand refused = subscription.value();
+      subscriptions_.erase(subscription);
+      if (refused.owner && refused.callback.isCallable())
+        if (const QJSValue ret = QJSValue{refused.callback}.call(
+                {false, QStringLiteral("null"),
+                 payload["error"]["message"].toString()});
+            ret.isError())
+          qCCritical(hassAPI) << "Subscription callback threw:" << ret.toString();
+      return;
+    }
+
     const auto pending = pending_commands_.find(payload["id"].toInt());
     if (pending == pending_commands_.end())
       return;
@@ -109,7 +125,22 @@ HassAPI::HassAPI(QObject *parent)
       qCCritical(hassAPI) << "Command callback threw:" << ret.toString();
   };
   message_handlers_["event"] = [this](QJsonDocument payload) {
-    eventHandler(payload);
+    const int id = payload["id"].toInt();
+    const auto subscription = subscriptions_.constFind(id);
+    if (subscription == subscriptions_.cend()) {
+      eventHandler(payload);
+      return;
+    }
+    if (!subscription->owner) {
+      unsubscribe(id);
+      return;
+    }
+    const QString event = QString::fromUtf8(
+        QJsonDocument{payload["event"].toObject()}.toJson(QJsonDocument::Compact));
+    if (const QJSValue ret = QJSValue{subscription->callback}.call(
+            {true, event, QString{}});
+        ret.isError())
+      qCCritical(hassAPI) << "Subscription callback threw:" << ret.toString();
   };
 
   QObject::connect(socket_, &QWebSocket::stateChanged,
@@ -194,6 +225,7 @@ void HassAPI::resetSession() {
   subscribed_entities_.clear();
   entity_states_.clear();
   pending_commands_.clear();
+  subscriptions_.clear();
   if (connected_) {
     connected_ = false;
     emit connectedChanged();
@@ -407,6 +439,32 @@ bool HassAPI::command(const QString &type, const QVariantMap &params,
   pending_commands_.insert(id, {owner, callback});
   socket_->sendTextMessage(QJsonDocument{request}.toJson(QJsonDocument::Compact));
   return true;
+}
+
+int HassAPI::subscribe(const QString &type, const QVariantMap &params,
+                       QObject *owner, QJSValue callback) {
+  if (!connected_) {
+    qCWarning(hassAPI) << "Not connected, dropping subscription" << type;
+    return 0;
+  }
+  QJsonObject request = QJsonObject::fromVariantMap(params);
+  const int id = request_id++;
+  request["id"] = id;
+  request["type"] = type;
+  subscriptions_.insert(id, {owner, callback});
+  socket_->sendTextMessage(QJsonDocument{request}.toJson(QJsonDocument::Compact));
+  return id;
+}
+
+void HassAPI::unsubscribe(int subscription) {
+  if (!subscriptions_.remove(subscription) || !connected_)
+    return;
+  // Ends any kind of subscription, not just subscribe_events.
+  QJsonObject request;
+  request["id"] = request_id++;
+  request["type"] = QLatin1StringView{"unsubscribe_events"};
+  request["subscription"] = subscription;
+  socket_->sendTextMessage(QJsonDocument{request}.toJson(QJsonDocument::Compact));
 }
 
 void HassAPI::light(QString entity_id, bool on) {

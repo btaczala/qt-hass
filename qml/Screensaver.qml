@@ -26,10 +26,15 @@ Popup {
     focus: true
     closePolicy: Popup.NoAutoClose
 
-    // Shown under the clock while connected. See WeatherSummary and
+    // Shown under the clock while connected, when set. See WeatherSummary and
     // EnergySummary for what they read.
-    required property string weatherEntity
-    required property var energyEntities
+    property string weatherEntity
+    property var energyEntities: null
+    // In the SystemTray in the top right corner.
+    property bool showBattery: false
+    property HassAlerts alerts: null
+    property bool showNotifications: false
+    property bool showSettingsAlerts: false
 
     // Only while shown and connected: nothing to read otherwise.
     readonly property bool live: screensaver.visible && HassAPI.connected
@@ -56,10 +61,11 @@ Popup {
         }
 
         readonly property real unit: screensaver.unit
+        readonly property real minY: tray.visible ? tray.y + tray.height + panel.unit * 0.02 : 0
         readonly property real room: energy.visible ? energy.y - panel.unit * 0.05 : screensaver.height
 
         x: panel.fractionX * Math.max(0, screensaver.width - panel.width)
-        y: panel.fractionY * Math.max(0, panel.room - panel.height)
+        y: panel.minY + panel.fractionY * Math.max(0, panel.room - panel.minY - panel.height)
         spacing: panel.unit * 0.05
 
         Behavior on opacity {
@@ -86,7 +92,7 @@ Popup {
 
         Loader {
             anchors.horizontalCenter: parent.horizontalCenter
-            active: screensaver.live
+            active: screensaver.live && screensaver.weatherEntity !== ""
             visible: active
 
             sourceComponent: WeatherSummary {
@@ -105,12 +111,27 @@ Popup {
         }
     }
 
+    SystemTray {
+        id: tray
+        anchors.top: parent.top
+        anchors.right: parent.right
+        anchors.margins: screensaver.unit * 0.03
+        showBattery: screensaver.showBattery
+        alerts: screensaver.alerts
+        showNotifications: screensaver.showNotifications
+        showSettingsAlerts: screensaver.showSettingsAlerts
+        fontSize: screensaver.unit * 0.03
+        textColor: "#808080"
+        alertColor: "#a04040"
+        color: "transparent"
+    }
+
     Loader {
         id: energy
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
         anchors.bottomMargin: screensaver.unit * 0.04
-        active: screensaver.live
+        active: screensaver.live && !!screensaver.energyEntities
         visible: active
 
         sourceComponent: EnergySummary {

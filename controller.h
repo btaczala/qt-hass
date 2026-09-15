@@ -26,6 +26,9 @@ class Controler : public QObject {
                  hassUrlChanged)
   Q_PROPERTY(QString hassToken READ hassToken WRITE setHassToken NOTIFY
                  hassTokenChanged)
+  // Where the dashboard comes from; empty means none is defined.
+  Q_PROPERTY(QString dashboardUrl READ dashboardUrl WRITE setDashboardUrl
+                 NOTIFY dashboardUrlChanged)
   Q_PROPERTY(bool screensaverActive READ screensaverActive WRITE
                  setScreensaverActive NOTIFY screensaverActiveChanged);
   // Seconds without user input before the screensaver starts; 0 means never.
@@ -38,6 +41,9 @@ class Controler : public QObject {
   Q_PROPERTY(bool keepScreenOn READ keepScreenOn WRITE setKeepScreenOn NOTIFY
                  keepScreenOnChanged)
   Q_PROPERTY(bool keepScreenOnSupported READ keepScreenOnSupported CONSTANT)
+  Q_PROPERTY(int batteryLevel READ batteryLevel NOTIFY batteryChanged)
+  Q_PROPERTY(bool batteryCharging READ batteryCharging NOTIFY batteryChanged)
+  Q_PROPERTY(bool batterySupported READ batterySupported CONSTANT)
   Q_PROPERTY(QString mqttBrokerHost READ mqttBrokerHost NOTIFY mqttConfigChanged)
   Q_PROPERTY(int mqttBrokerPort READ mqttBrokerPort NOTIFY mqttConfigChanged)
   Q_PROPERTY(QString mqttUsername READ mqttUsername NOTIFY mqttConfigChanged)
@@ -86,6 +92,11 @@ public:
   // environment and bundled config again.
   Q_INVOKABLE void clearSavedConnection();
 
+  // The bundled DASHBOARD_URL, overridden by a URL saved from the settings
+  // page. Saving an empty URL forgets the saved one.
+  QString dashboardUrl() const noexcept { return dashboard_url_; }
+  void setDashboardUrl(const QString &url);
+
   bool screensaverActive() const noexcept { return screensaver_active_; }
   void setScreensaverActive(bool active);
 
@@ -107,6 +118,12 @@ public:
   bool keepScreenOn() const noexcept { return keep_screen_on_; }
   void setKeepScreenOn(bool on);
   static bool keepScreenOnSupported() noexcept;
+
+  // This device's battery, polled on Android only: level in percent (-1 while
+  // unknown, and always off Android) and whether it's on external power.
+  int batteryLevel() const noexcept { return battery_level_; }
+  bool batteryCharging() const noexcept { return battery_charging_; }
+  static bool batterySupported() noexcept;
 
   // Remote Admin (RemoteAdmin) config: the bundled REMOTE_ADMIN_* keys,
   // overridden by values saved at setup. The server only listens while
@@ -171,10 +188,12 @@ signals:
 
   void hassUrlChanged();
   void hassTokenChanged();
+  void dashboardUrlChanged();
   void screensaverActiveChanged();
   void idleTimeoutSecondsChanged();
   void hassConnectedChanged();
   void keepScreenOnChanged();
+  void batteryChanged();
   void mqttConfigChanged();
   void mqttConnectedChanged();
   void setupCompletedChanged();
@@ -198,6 +217,9 @@ private:
   void loadMqttConfig();
   // Applies keep_screen_on_ to the Android activity window; a no-op elsewhere.
   void applyKeepScreenOn() const;
+  // Reads the battery into battery_level_/battery_charging_; a no-op off
+  // Android.
+  void updateBattery();
 
   QString bundledValue(const QString &key) const {
     return bundled_config_.value(key);
@@ -214,9 +236,13 @@ private:
   bool setup_completed_{false};
   int idle_timeout_seconds_{60};
   QTimer is_idle_timer_;
+  int battery_level_{-1};
+  bool battery_charging_{false};
+  QTimer battery_timer_;
   QHash<QString, QString> bundled_config_;
   QString hass_url_;
   QString hass_token_;
+  QString dashboard_url_;
   QString mqtt_broker_host_;
   int mqtt_broker_port_{1883};
   QString mqtt_username_;

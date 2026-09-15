@@ -29,7 +29,7 @@ EntityBase {
     property string streamUrl
 
     readonly property var attributes: root.entity_data?.attributes ?? ({})
-    readonly property string displayName: root.name || root.attributes.friendly_name || root.entity_id
+    readonly property string displayName: root.name || root.attributes.friendly_name || root.entityId
     readonly property string proxyPath: root.attributes.entity_picture ?? ""
 
     update: function (response) {
@@ -53,7 +53,7 @@ EntityBase {
 
     CameraSensors {
         id: sensors
-        cameraEntity: root.entity_id
+        cameraEntity: root.entityId
         motionEntity: root.motionEntity
         darkEntity: root.darkEntity
         lastMotionEntity: root.lastMotionEntity
@@ -122,7 +122,7 @@ EntityBase {
 
     CameraStreamPopup {
         id: stream
-        entity_id: root.entity_id
+        entityId: root.entityId
         name: root.displayName
         sensors: sensors
         streamUrl: root.streamUrl

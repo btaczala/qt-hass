@@ -13,10 +13,10 @@ import QtHomeAssistant
 //     ButtonsFeature {}    // one "Press" button for the tile's own entity
 //     ButtonsFeature {
 //         outlined: true
-//         entries: [{ entity_id: "button.vacuum_quick", icon: "mdi:vacuum", label: "Quick" }]
+//         entries: [{ entityId: "button.vacuum_quick", icon: "mdi:vacuum", label: "Quick" }]
 //     }
 //
-// An entry's entity_id, icon and label are all optional: the entity defaults
+// An entry's entityId, icon and label are all optional: the entity defaults
 // to the tile's own, the label to "Press".
 TileFeature {
     id: root
@@ -55,7 +55,7 @@ TileFeature {
                 Layout.preferredWidth: 1
 
                 Accessible.name: contentLabel.text
-                onClicked: root.press(button.modelData.entity_id || root.tile.entity_id)
+                onClicked: root.press(button.modelData.entityId || root.tile.entityId)
 
                 background: Rectangle {
                     radius: root.outlined ? height / 2 : 12

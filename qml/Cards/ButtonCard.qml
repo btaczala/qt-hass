@@ -9,7 +9,7 @@ import QtHomeAssistant
 // Tapping runs the entity's default action -- a script or scene runs, a button
 // is pressed, anything else toggles.
 //
-//     ButtonCard { entity_id: "script.good_morning" }
+//     ButtonCard { entityId: "script.good_morning" }
 EntityBase {
     id: root
 
@@ -18,17 +18,17 @@ EntityBase {
     property string icon
     property real iconSize: 64
 
-    readonly property string domain: root.entity_id.split(".")[0]
+    readonly property string domain: root.entityId.split(".")[0]
     readonly property var attributes: root.entity_data?.attributes ?? ({})
     readonly property string entityState: root.entity_data?.state ?? "unknown"
 
     function press() {
         if (root.domain === "button" || root.domain === "input_button")
-            HassAPI.callService(root.domain, "press", root.entity_id);
+            HassAPI.callService(root.domain, "press", root.entityId);
         else if (root.domain === "script" || root.domain === "scene")
-            HassAPI.callService(root.domain, "turn_on", root.entity_id);
+            HassAPI.callService(root.domain, "turn_on", root.entityId);
         else
-            HassAPI.callService("homeassistant", "toggle", root.entity_id);
+            HassAPI.callService("homeassistant", "toggle", root.entityId);
     }
 
     update: function (response) {
@@ -63,7 +63,7 @@ EntityBase {
             horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
             font.pixelSize: 14
-            text: root.name || root.attributes.friendly_name || root.entity_id
+            text: root.name || root.attributes.friendly_name || root.entityId
         }
     }
 }

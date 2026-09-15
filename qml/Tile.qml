@@ -9,7 +9,7 @@ import QtHomeAssistant
 // circle, its name and state, and an optional stack of features underneath.
 //
 //     Tile {
-//         entity_id: "switch.kettle"
+//         entityId: "switch.kettle"
 //         features: [ ToggleFeature {} ]
 //     }
 //
@@ -40,7 +40,7 @@ EntityBase {
     // Gap above each stacked feature, and beside an inline one.
     readonly property real featureSpacing: 12
 
-    readonly property string domain: root.entity_id.split(".")[0]
+    readonly property string domain: root.entityId.split(".")[0]
     readonly property var attributes: root.entity_data?.attributes ?? ({})
     // Not `state`: that is Item's own property, the one that drives `states`.
     readonly property string entityState: root.entity_data?.state ?? "unknown"
@@ -73,7 +73,7 @@ EntityBase {
     // e.g. a template-card-style color that depends on the state.
     property color stateColor: root.isActive ? root.activeColor : root.Material.hintTextColor
 
-    readonly property string displayName: root.name || root.attributes.friendly_name || root.entity_id
+    readonly property string displayName: root.name || root.attributes.friendly_name || root.entityId
 
     // [resting, active] icons for domains Home Assistant draws per state.
     readonly property var domainIcons: ({
@@ -135,7 +135,7 @@ EntityBase {
     // `on` means the active state: for a lock, unlocked.
     function setOn(on) {
         const services = root.toggleServices[root.domain] ?? ["turn_off", "turn_on"];
-        HassAPI.callService(root.domain, services[on ? 1 : 0], root.entity_id);
+        HassAPI.callService(root.domain, services[on ? 1 : 0], root.entityId);
     }
 
     function toggle() {
@@ -143,7 +143,7 @@ EntityBase {
     }
 
     function moreInfo() {
-        Controler.requestDetails(root.entity_id, root.displayName);
+        Controler.requestDetails(root.entityId, root.displayName);
     }
 
     function placeFeatures() {

@@ -25,6 +25,7 @@ from pathlib import Path
 KEYS = (
     "HASS_URL",
     "HASS_TOKEN",
+    "DASHBOARD_URL",
     "IDLE_TIMEOUT_SECONDS",
     "REMOTE_ADMIN_PASSWORD",
     "REMOTE_ADMIN_PORT",

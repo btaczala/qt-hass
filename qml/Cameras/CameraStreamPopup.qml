@@ -22,7 +22,7 @@ import "CameraUrls.js" as CameraUrls
 Popup {
     id: root
 
-    required property string entity_id
+    required property string entityId
     property string name
     // Shown under the name, when set.
     property CameraSensors sensors
@@ -52,7 +52,7 @@ Popup {
         }
         root.loading = true;
         const sent = HassAPI.command("camera/stream", {
-            entity_id: root.entity_id,
+            entity_id: root.entityId,
             format: "hls"
         }, root, (ok, json) => {
             root.loading = false;

@@ -118,4 +118,11 @@ RUN git clone --branch "v${QT_VERSION}" --depth 1 https://github.com/qt/qtmqtt.g
   && cmake --install /tmp/qtmqtt-build \
   && rm -rf /tmp/qtmqtt /tmp/qtmqtt-build
 
+# ubuntu:24.04 ships no locale, so everything runs under "C" (ASCII), and
+# every Qt host tool (qmlcachegen, rcc, ...) warns that it switched to
+# C.UTF-8 on its own. C.UTF-8 is built into glibc, nothing to install. Kept
+# down here rather than next to DEBIAN_FRONTEND so adding it didn't
+# invalidate the cached Qt/SDK layers above.
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
+
 WORKDIR /workspace

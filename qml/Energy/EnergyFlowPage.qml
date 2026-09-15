@@ -2,136 +2,54 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls.Material
-import QtQuick.Layouts
 
 import QtHomeAssistant
 
-// Energy overview: power flowing between solar, battery, grid and home right
-// now, or energy since midnight, from Home Assistant (HassEnergySource);
-// tapping a circle opens its details.
+// A whole energy page: power flowing between solar, battery, grid and home
+// right now, or energy since midnight, from Home Assistant (HassEnergySource);
+// tapping a circle opens its details. Every entity it reads is a required
+// property, passed on as-is to HassEnergySource, which documents what each one
+// has to provide (units, signs, statistics).
 Item {
     id: root
 
-    // Every Home Assistant entity this page reads. See HassEnergySource for
-    // what each one has to provide (units, signs, statistics).
-
     // Live power
-    readonly property string solarPowerEntity: "sensor.selfa_inverter_pv_input_power"
-    // Import-positive: sensor.selfa_inverter_grid_meter_power is the opposite
-    // sign.
-    readonly property string gridPowerEntity: "sensor.selfa_inverter_grid_meter_power_inverted"
-    readonly property string batteryPowerEntity: "sensor.selfa_inverter_battery_power"
-    readonly property string homePowerEntity: "sensor.selfa_inverter_home_power"
+    required property string solarPowerEntity
+    // Import-positive.
+    required property string gridPowerEntity
+    required property string batteryPowerEntity
+    required property string homePowerEntity
 
-    // Home consumers: the Energy dashboard's individual devices, except the
-    // car, which is read from evcc like the power-flow cards do.
-    readonly property var consumerEntities: [
-        {
-            name: "JCW",
-            icon: "mdi:car-electric",
-            entity: "sensor.evcc_garage_charge_power"
-        },
-        {
-            name: "Rack",
-            icon: "mdi:server-network",
-            entity: "sensor.shelly_mini_rack_power"
-        },
-        {
-            name: "Biurko główne w biurze",
-            icon: "mdi:desk",
-            entity: "sensor.tapo_smart_plug_biurko_glowne_moc_1"
-        },
-        {
-            name: "Biurko drugie w biurze",
-            icon: "mdi:desktop-tower-monitor",
-            entity: "sensor.tapo_smart_plug_biurko_drugie_moc_1"
-        },
-        {
-            name: "VS Servers rack",
-            icon: "mdi:server",
-            entity: "sensor.shelly_pm_mini_vs_rack_moc",
-            insideOf: "sensor.tapo_smart_plug_biurko_drugie_moc_1"
-        },
-        {
-            name: "Albert biurko",
-            icon: "mdi:desk",
-            entity: "sensor.shelly_plug_albert_biuro_switch_0_power"
-        },
-        {
-            name: "Albert TV",
-            icon: "mdi:television",
-            entity: "sensor.shelly_plug_albert_tv_switch_0_power"
-        },
-        {
-            name: "Szafka RTV",
-            icon: "mdi:television-classic",
-            entity: "sensor.shelly_plug_szafka_rtv_switch_0_power"
-        },
-        {
-            name: "Pralka",
-            icon: "mdi:washing-machine",
-            entity: "sensor.pralka_power"
-        },
-        {
-            name: "Zmywarka",
-            icon: "mdi:dishwasher",
-            entity: "sensor.grillplats_plug_moc"
-        },
-        {
-            name: "Lodówka",
-            icon: "mdi:fridge",
-            entity: "sensor.gniazdko_lodowka_power"
-        },
-        {
-            name: "Termowentylator w łazience na dole",
-            icon: "mdi:fan",
-            entity: "sensor.shelly_plug_s_lazienka_dol_switch_0_power"
-        },
-        {
-            name: "Grzejnik",
-            icon: "mdi:radiator",
-            entity: "sensor.shelly_1_pm_grzejnik_power"
-        },
-        {
-            name: "Shelly basen",
-            icon: "mdi:pool",
-            entity: "sensor.shellyoutdoorsg3_e4b3232d5408_power"
-        },
-        {
-            name: "Ogród gniazdo",
-            icon: "mdi:power-socket-eu",
-            entity: "sensor.shelly_pm_gniazdo_ogrod_moc"
-        }
-    ]
+    // Home consumers: [{name, icon, entity, insideOf}], see HassEnergySource.
+    required property var consumerEntities
 
     // Battery
-    readonly property string batterySocEntity: "sensor.selfa_inverter_battery_soc"
-    readonly property string batteryMinSocEntity: "sensor.selfa_inverter_battery_low_soc_limit"
-    readonly property string batteryCapacityEntity: "sensor.selfa_inverter_selfa_battery_capacity"
-    // Not exposed by the inverter integration; its battery power scheduling
-    // limit is 5 kW.
-    readonly property real batteryMaxPower: 5000
+    required property string batterySocEntity
+    required property string batteryMinSocEntity
+    required property string batteryCapacityEntity
+    // In W.
+    required property real batteryMaxPower
 
     // Energy today
-    readonly property string solarEnergyTodayEntity: "sensor.selfa_inverter_daily_pv_generation"
-    readonly property string homeEnergyTodayEntity: "sensor.selfa_inverter_daily_load_consumption"
+    required property string solarEnergyTodayEntity
+    required property string homeEnergyTodayEntity
 
     // Energy totals, for history
-    readonly property string gridImportTotalEntity: "sensor.selfa_inverter_total_grid_purchase"
-    readonly property string gridExportTotalEntity: "sensor.selfa_inverter_total_grid_injection"
-    readonly property string batteryChargeTotalEntity: "sensor.selfa_inverter_energy_charged_into_battery"
-    readonly property string batteryDischargeTotalEntity: "sensor.selfa_inverter_energy_discharged_from_battery"
-    readonly property string homeEnergyTotalEntity: "sensor.selfa_inverter_home_energy"
-    readonly property string solarEnergyTotalEntity: "sensor.selfa_inverter_total_pv_generation"
+    required property string gridImportTotalEntity
+    required property string gridExportTotalEntity
+    required property string batteryChargeTotalEntity
+    required property string batteryDischargeTotalEntity
+    required property string homeEnergyTotalEntity
+    required property string solarEnergyTotalEntity
 
     // Solar forecast (Solcast)
-    readonly property string solarForecastEntity: "sensor.solcast_pv_forecast_prognoza_na_dzisiaj"
+    required property string solarForecastEntity
     // From tomorrow on.
-    readonly property var solarForecastDayEntities: ["sensor.solcast_pv_forecast_prognoza_na_jutro", "sensor.solcast_pv_forecast_prognoza_na_dzien_3", "sensor.solcast_pv_forecast_prognoza_na_dzien_4", "sensor.solcast_pv_forecast_prognoza_na_dzien_5", "sensor.solcast_pv_forecast_prognoza_na_dzien_6", "sensor.solcast_pv_forecast_prognoza_na_dzien_7"]
+    required property var solarForecastDayEntities
 
     // Prices (Pstryk)
-    readonly property string buyPriceEntity: "sensor.pstryk_current_buy_price"
-    readonly property string sellPriceEntity: "sensor.pstryk_current_sell_price"
+    required property string buyPriceEntity
+    required property string sellPriceEntity
 
     HassEnergySource {
         id: source

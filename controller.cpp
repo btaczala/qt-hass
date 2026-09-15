@@ -20,10 +20,13 @@ Q_LOGGING_CATEGORY(controller, "qthass.controller")
 Controler *Controler::s_instance = nullptr;
 namespace {
 const auto kDefaultIdleTimeout = std::chrono::seconds(60);
+// Quick enough that plugging in shows up soon; the read is a single binder call.
+const auto kBatteryPollInterval = std::chrono::seconds(5);
 const auto kConfigPath = QStringLiteral(":/qt-hass/config");
 
 const auto kHassUrlKey = QStringLiteral("connection/url");
 const auto kHassTokenKey = QStringLiteral("connection/token");
+const auto kDashboardUrlKey = QStringLiteral("dashboard/url");
 const auto kIdleTimeoutKey = QStringLiteral("idleTimeout");
 const auto kKeepScreenOnKey = QStringLiteral("display/keepScreenOn");
 const auto kMqttHostKey = QStringLiteral("mqtt/host");
@@ -66,6 +69,9 @@ Controler::Controler(QObject *parent)
 
   loadConnection();
   loadMqttConfig();
+  dashboard_url_ = QSettings{}
+                       .value(kDashboardUrlKey, bundledValue("DASHBOARD_URL"))
+                       .toString();
 
   // Never saved: an install that already has a token (bundled, environment
   // or saved from the settings page) is set up; only one without runs setup.
@@ -75,6 +81,14 @@ Controler::Controler(QObject *parent)
 
   keep_screen_on_ = QSettings{}.value(kKeepScreenOnKey, false).toBool();
   applyKeepScreenOn();
+
+  if (batterySupported()) {
+    battery_timer_.setInterval(kBatteryPollInterval);
+    connect(&battery_timer_, &QTimer::timeout, this,
+            &Controler::updateBattery);
+    battery_timer_.start();
+    updateBattery();
+  }
 }
 
 void Controler::setKeepScreenOn(bool on) {
@@ -112,6 +126,61 @@ void Controler::applyKeepScreenOn() const {
         window.callMethod<void>(on ? "addFlags" : "clearFlags", "(I)V",
                                 kFlagKeepScreenOn);
       });
+#endif
+}
+
+bool Controler::batterySupported() noexcept {
+#ifdef Q_OS_ANDROID
+  return true;
+#else
+  return false;
+#endif
+}
+
+void Controler::updateBattery() {
+#ifdef Q_OS_ANDROID
+  // ACTION_BATTERY_CHANGED is sticky: registering a null receiver just returns
+  // the last broadcast, with level, charge status and power source in one go.
+  // Preferred over BatteryManager.getIntProperty(), which returns garbage on
+  // some older devices.
+  const QJniObject context = QNativeInterface::QAndroidApplication::context();
+  const QJniObject filter = QJniObject(
+      "android/content/IntentFilter", "(Ljava/lang/String;)V",
+      QJniObject::fromString(
+          QStringLiteral("android.intent.action.BATTERY_CHANGED"))
+          .object<jstring>());
+  const QJniObject intent = context.callObjectMethod(
+      "registerReceiver",
+      "(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;)"
+      "Landroid/content/Intent;",
+      jobject(nullptr), filter.object());
+  if (!intent.isValid()) {
+    qCWarning(controller) << "No battery status available";
+    return;
+  }
+
+  const auto extra = [&intent](const char *name, jint fallback) {
+    return intent.callMethod<jint>(
+        "getIntExtra", "(Ljava/lang/String;I)I",
+        QJniObject::fromString(QString::fromLatin1(name)).object<jstring>(),
+        fallback);
+  };
+  const jint level = extra("level", -1);
+  const jint scale = extra("scale", 100);
+  // BatteryManager.BATTERY_STATUS_CHARGING / BATTERY_STATUS_FULL
+  const jint status = extra("status", -1);
+  const jint plugged = extra("plugged", 0);
+
+  const int percent =
+      level >= 0 && scale > 0 ? qRound(100.0 * level / scale) : -1;
+  // Plugged in counts too: a wall-mounted tablet held at a charge limit
+  // reports "not charging" while on power.
+  const bool charging = status == 2 || status == 5 || plugged != 0;
+  if (percent == battery_level_ && charging == battery_charging_)
+    return;
+  battery_level_ = percent;
+  battery_charging_ = charging;
+  Q_EMIT batteryChanged();
 #endif
 }
 
@@ -225,6 +294,21 @@ void Controler::setHassToken(const QString &token) {
   hass_token_ = token;
   QSettings{}.setValue(kHassTokenKey, token);
   Q_EMIT hassTokenChanged();
+}
+
+void Controler::setDashboardUrl(const QString &url) {
+  QSettings settings;
+  if (url.isEmpty())
+    settings.remove(kDashboardUrlKey);
+  else
+    settings.setValue(kDashboardUrlKey, url);
+  const QString resolved =
+      settings.value(kDashboardUrlKey, bundledValue("DASHBOARD_URL"))
+          .toString();
+  if (resolved == dashboard_url_)
+    return;
+  dashboard_url_ = resolved;
+  Q_EMIT dashboardUrlChanged();
 }
 
 void Controler::setScreensaverActive(bool active) {

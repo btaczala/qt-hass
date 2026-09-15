@@ -56,14 +56,14 @@ EntityBase {
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
-                text: root.entity_data ? root.entity_data['attributes'].friendly_name : root.entity_id
+                text: root.entity_data ? root.entity_data['attributes'].friendly_name : root.entityId
             }
         }
         MouseArea {
             anchors.fill: parent
             onClicked: {
-                console.log('clicked light', root.entity_id);
-                HassAPI.light(root.entity_id, !root.on);
+                console.log('clicked light', root.entityId);
+                HassAPI.light(root.entityId, !root.on);
             }
         }
     }

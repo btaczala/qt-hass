@@ -1,0 +1,6 @@
+# The files of this dashboard besides main.qml, which qthomeassistant downloads
+# along with it. Each line: <type name> <version> <file>.
+OfficeOverview 1.0 OfficeOverview.qml
+OfficeEnergy 1.0 OfficeEnergy.qml
+OfficeCameras 1.0 OfficeCameras.qml
+OfficeDoNotDisturb 1.0 OfficeDoNotDisturb.qml

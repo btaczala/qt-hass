@@ -7,7 +7,7 @@ import QtHomeAssistant
 
 Pane {
     id: root
-    required property string entity_id
+    required property string entityId
 
     width: 10
     height: 10
@@ -19,13 +19,13 @@ Pane {
     Material.roundedScale: Material.SmallScale
 
     Component.onCompleted: {
-        HassAPI.registerStateChanges(root.entity_id, root.update)
+        HassAPI.registerStateChanges(root.entityId, root.update)
     }
 
     // Without this, a destroyed card (e.g. a StackView page switch) leaves
     // its callback registered forever -- the next state update for this
     // entity then calls into a deleted object.
     Component.onDestruction: {
-        HassAPI.unregisterStateChanges(root.entity_id, root.update)
+        HassAPI.unregisterStateChanges(root.entityId, root.update)
     }
 }

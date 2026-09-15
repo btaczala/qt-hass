@@ -7,8 +7,8 @@ import QtHomeAssistant
 
 // The office panel's main view, after Home Assistant's nspanel-office /
 // nspanel-main dashboard: a clock over two columns of cards, stacked into one
-// when the window is narrow. Its "do not disturb" section is DoNotDisturb.qml,
-// shown over the whole app from Main.qml.
+// when the window is narrow. Its "do not disturb" section is
+// OfficeDoNotDisturb.qml, an overlay in main.qml.
 Flickable {
     id: root
 
@@ -34,6 +34,7 @@ Flickable {
             Layout.alignment: Qt.AlignHCenter
             size: 240
             showDate: false
+            weatherEntity: "weather.pirateweather"
             color: root.Material.foreground
         }
 
@@ -60,29 +61,29 @@ Flickable {
                     ButtonCard {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 120
-                        entity_id: "script.dzien_dobry"
+                        entityId: "script.dzien_dobry"
                     }
                     ButtonCard {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 120
-                        entity_id: "script.dobranoc"
+                        entityId: "script.dobranoc"
                     }
                 }
 
                 Tile {
                     Layout.fillWidth: true
-                    entity_id: "vacuum.vaderek"
+                    entityId: "vacuum.vaderek"
                     features: [
                         ButtonsFeature {
                             outlined: true
                             entries: [
                                 {
-                                    entity_id: "button.vaderek_shortcut_1",
+                                    entityId: "button.vaderek_shortcut_1",
                                     icon: "mdi:vacuum",
                                     label: "Odk"
                                 },
                                 {
-                                    entity_id: "button.vaderek_shortcut_3",
+                                    entityId: "button.vaderek_shortcut_3",
                                     icon: "mdi:spray-bottle",
                                     label: "O + M"
                                 }
@@ -100,7 +101,7 @@ Flickable {
                         id: frontDoor
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        entity_id: "lock.drzwi_wejsciowe"
+                        entityId: "lock.drzwi_wejsciowe"
                         stateColor: frontDoor.isUnavailable ? frontDoor.Material.hintTextColor : frontDoor.entityState === "locked" ? root.green : root.red
                     }
                     AlarmCard {
@@ -123,7 +124,7 @@ Flickable {
                 Tile {
                     id: occupancy
                     Layout.fillWidth: true
-                    entity_id: "binary_sensor.zajetosc_biura"
+                    entityId: "binary_sensor.zajetosc_biura"
                     name: occupancy.isOn ? qsTr("Ojciec w biurze") : qsTr("Puste biuro")
                     icon: occupancy.isOn ? "mdi:motion-sensor" : "mdi:motion-sensor-off"
                     hideState: true
@@ -135,7 +136,7 @@ Flickable {
                     readonly property bool cold: Number(temperature.entityState) < 22 || !temperature.isActive
 
                     Layout.fillWidth: true
-                    entity_id: "sensor.ikea_vindstyrka_czujnik_temperatury_temperature"
+                    entityId: "sensor.ikea_vindstyrka_czujnik_temperatury_temperature"
                     name: qsTr("%1 °C").arg(temperature.entityState)
                     icon: "mdi:thermometer"
                     stateDisplay: temperature.cold ? qsTr("Zimno") : qsTr("ok")
@@ -150,7 +151,7 @@ Flickable {
                     Tile {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        entity_id: "script.szybkie_grzanie_w_biurze"
+                        entityId: "script.szybkie_grzanie_w_biurze"
                         name: qsTr("grzanie")
                         features: [
                             ButtonsFeature {}
@@ -159,7 +160,7 @@ Flickable {
                     Tile {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        entity_id: "input_boolean.bartek_nie_przeszkadac"
+                        entityId: "input_boolean.bartek_nie_przeszkadac"
                         features: [
                             ToggleFeature {}
                         ]

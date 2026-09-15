@@ -28,7 +28,7 @@ TileFeature {
 
         onPressedChanged: {
             if (!slider.pressed)
-                HassAPI.callService("light", "turn_on", root.tile.entity_id, {
+                HassAPI.callService("light", "turn_on", root.tile.entityId, {
                     brightness_pct: slider.value
                 });
         }

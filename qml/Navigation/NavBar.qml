@@ -10,13 +10,13 @@ import QtHomeAssistant
 // Floating navigation bar in the style of lovelace-navbar-card: a rounded card
 // of icon buttons, docked to any edge -- a vertical rail on the left or right,
 // a row at the top or bottom -- with the current page's icon in a tinted pill.
-// The last button opens the settings drawer.
+// The last button opens the settings.
 Pane {
     id: root
 
     // "left", "right", "top" or "bottom".
     property string position: "left"
-    // [{icon, label}], one per page.
+    // One button per item, from its title and icon: the Dashboard's pages.
     property var items: []
     property int currentIndex: 0
 
@@ -92,7 +92,7 @@ Pane {
                 required property var modelData
                 required property int index
                 iconName: modelData.icon
-                text: modelData.label
+                text: modelData.title
                 checked: index === root.currentIndex
                 onClicked: root.currentIndex = index
             }

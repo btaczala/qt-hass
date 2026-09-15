@@ -13,8 +13,8 @@ import "EnergyFlows.js" as EnergyFlows
 // local hours -- since that day's midnight for a day's series, since the epoch
 // (`absoluteHour`) for the week of SoC history.
 //
-// Which entities to read is up to the user (see the list at the top of
-// PageEnergy.qml); what each has to provide is documented on its property.
+// Which entities to read is up to the user (EnergyFlowPage takes them as its
+// own properties); what each has to provide is documented on its property.
 // Anything historical comes from recorder statistics, so those entities need a
 // state_class. Only exists while connected (the dashboard does), so statistics
 // are fetched on creation and then refreshed on a timer.

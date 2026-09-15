@@ -11,19 +11,10 @@
 #include "remoteadmin.h"
 
 int main(int argc, char *argv[]) {
-  // QApplication rather than QGuiApplication: Qt Charts' QML types are built
-  // on Graphics View, which needs the widgets application object.
   QApplication app(argc, argv);
-  // Required for QSettings (Controler) and QtCore's Settings (Main.qml) to
-  // share one persistent store.
-  QCoreApplication::setOrganizationName("qt-hass");
-  QCoreApplication::setApplicationName("qthomeassistant");
+  QCoreApplication::setOrganizationName("qthass");
+  QCoreApplication::setApplicationName("QtHass");
   QQmlApplicationEngine engine;
-
-  QDirIterator it(":", QDirIterator::Subdirectories);
-  // while (it.hasNext()) {
-  //   qDebug() << it.next();
-  // }
 
   qSetMessagePattern(
       "[%{time process}][%{category}][%{type}][%{file}@%{line}] %{message}");
@@ -31,15 +22,7 @@ int main(int argc, char *argv[]) {
   engine.addImportPath(":/res");
   engine.rootContext()->setContextProperty("platform", QSysInfo::productType());
 
-  // engine.singletonInstance(), not Controler::create()/instance(): calling
-  // our own registered create() directly from C++ was observed to construct
-  // a *second*, separate Controler instance from whatever QML itself
-  // resolves the singleton to (each internally self-consistent, but
-  // disagreeing with each other) -- singletonInstance() goes through the
-  // engine's own singleton registry instead, guaranteeing this is the exact
-  // instance QML will use. Must be called before load(), per Qt's own
-  // singleton documentation.
-  Controler *controler =
+  auto *controler =
       engine.singletonInstance<Controler *>("QtHomeAssistant", "Controler");
 
   using namespace Qt::StringLiterals;

@@ -61,6 +61,18 @@ public slots:
   bool command(const QString &type, const QVariantMap &params, QObject *owner,
                QJSValue callback);
 
+  // Sends a subscription command, e.g.
+  // subscribe("persistent_notification/subscribe", {}, this, fn), and calls
+  // fn(ok, eventJson, errorMessage) with each event's `event` as a JSON
+  // string -- or once with ok false when HA refuses it (e.g. an admin-only
+  // command for a non-admin user). Subscriptions end with the connection, so
+  // subscribe again once `connected` is back. Ends early, unsubscribing, once
+  // `owner` is destroyed. Returns the subscription id, or 0 (and never calls
+  // back) when not connected.
+  int subscribe(const QString &type, const QVariantMap &params, QObject *owner,
+                QJSValue callback);
+  void unsubscribe(int subscription);
+
 signals:
   void error(QString);
   void connectedChanged();
@@ -111,6 +123,9 @@ private:
     QJSValue callback;
   };
   QHash<int, PendingCommand> pending_commands_;
+  // Live subscribe() callbacks by subscription id; unlike pending_commands_,
+  // kept past the first result.
+  QHash<int, PendingCommand> subscriptions_;
   int request_id{1};
 };
 
